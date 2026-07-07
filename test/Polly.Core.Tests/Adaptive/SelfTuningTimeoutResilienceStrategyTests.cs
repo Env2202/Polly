@@ -180,6 +180,193 @@ public class SelfTuningTimeoutResilienceStrategyTests
         strategy.GetCurrentTimeout().ShouldBe(TimeSpan.FromMilliseconds(50));
     }
 
+    [Fact]
+    public void GetCurrentTimeout_ZeroLatencySamples_FallsBackToInitial_ClampedToMin()
+    {
+        var options = CreateOptions();
+        options.MinimumSamples = 2;
+        options.InitialTimeout = TimeSpan.FromMilliseconds(5); // below min → clamp up
+        options.MinTimeout = TimeSpan.FromMilliseconds(50);
+        options.MaxTimeout = TimeSpan.FromSeconds(5);
+        options.LatencyPercentile = 1.0;
+
+        var strategy = CreateStrategy(options);
+        strategy.Metrics.Record(TimeSpan.Zero, true);
+        strategy.Metrics.Record(TimeSpan.Zero, true);
+
+        strategy.GetCurrentTimeout().ShouldBe(TimeSpan.FromMilliseconds(50));
+    }
+
+    [Fact]
+    public void GetCurrentTimeout_MultiplierOne_DoesNotUseOverflowGuard()
+    {
+        var options = CreateOptions();
+        options.MinimumSamples = 1;
+        options.LatencyPercentile = 1.0;
+        options.TimeoutMultiplier = 1.0;
+        options.MinTimeout = TimeSpan.FromMilliseconds(10);
+        options.MaxTimeout = TimeSpan.FromSeconds(30);
+        options.InitialTimeout = TimeSpan.FromSeconds(1);
+
+        var strategy = CreateStrategy(options);
+        strategy.Metrics.Record(TimeSpan.FromMilliseconds(40), true);
+        strategy.GetCurrentTimeout().ShouldBe(TimeSpan.FromMilliseconds(40));
+    }
+
+    [Fact]
+    public void GetCurrentTimeout_ScaledBelowMin_ClampsToMin()
+    {
+        var options = CreateOptions();
+        options.MinimumSamples = 1;
+        options.LatencyPercentile = 1.0;
+        options.TimeoutMultiplier = 1.0;
+        options.MinTimeout = TimeSpan.FromMilliseconds(200);
+        options.MaxTimeout = TimeSpan.FromSeconds(30);
+        options.InitialTimeout = TimeSpan.FromSeconds(1);
+
+        var strategy = CreateStrategy(options);
+        strategy.Metrics.Record(TimeSpan.FromMilliseconds(10), true);
+        strategy.GetCurrentTimeout().ShouldBe(TimeSpan.FromMilliseconds(200));
+    }
+
+    [Fact]
+    public void GetCurrentTimeout_OverflowScaledTicks_ReturnsMaxTimeout()
+    {
+        var options = CreateOptions();
+        options.MinimumSamples = 1;
+        options.LatencyPercentile = 1.0;
+        options.TimeoutMultiplier = 10;
+        options.MinTimeout = TimeSpan.FromMilliseconds(10);
+        options.MaxTimeout = TimeSpan.FromSeconds(30);
+        options.InitialTimeout = TimeSpan.FromSeconds(1);
+
+        var strategy = CreateStrategy(options);
+        // Large duration * multiplier would overflow long — strategy returns max timeout.
+        strategy.Metrics.Record(TimeSpan.FromTicks(long.MaxValue / 2), true);
+
+        strategy.GetCurrentTimeout().ShouldBe(TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public async Task ExecuteOutcomeAsync_CallbackThrows_IsCapturedAsOutcome()
+    {
+        var options = CreateOptions();
+        options.InitialTimeout = TimeSpan.FromSeconds(5);
+        options.MinimumSamples = 100;
+
+        var strategy = CreateStrategy(options);
+        var pipeline = strategy.AsPipeline();
+        var context = ResilienceContextPool.Shared.Get(TestCancellation.Token);
+        try
+        {
+            var outcome = await pipeline.ExecuteOutcomeAsync<int, string>(
+                static (_, _) => throw new InvalidOperationException("direct"),
+                context,
+                "state");
+
+            outcome.Exception.ShouldBeOfType<InvalidOperationException>();
+            strategy.Metrics.GetSnapshot().FailureCount.ShouldBe(1);
+        }
+        finally
+        {
+            ResilienceContextPool.Shared.Return(context);
+        }
+    }
+
+    [Fact]
+    public async Task Execute_ZeroTimeout_CallbackThrows_IsNotRecordedWhenRecordSuccessOnly()
+    {
+        var options = CreateOptions();
+        options.InitialTimeout = TimeSpan.Zero;
+        options.MinTimeout = TimeSpan.Zero;
+        options.MaxTimeout = TimeSpan.FromSeconds(1);
+        options.MinimumSamples = 100;
+
+        var strategy = CreateStrategy(options);
+        var pipeline = strategy.AsPipeline();
+        var context = ResilienceContextPool.Shared.Get(TestCancellation.Token);
+        try
+        {
+            var outcome = await pipeline.ExecuteOutcomeAsync<int, string>(
+                static (_, _) => throw new InvalidOperationException("direct"),
+                context,
+                "state");
+
+            outcome.Exception.ShouldBeOfType<InvalidOperationException>();
+            strategy.Metrics.GetSnapshot().SampleCount.ShouldBe(0);
+        }
+        finally
+        {
+            ResilienceContextPool.Shared.Return(context);
+        }
+    }
+
+    [Fact]
+    public async Task Execute_ZeroTimeout_SkipsTimeoutAndRecordsSuccessOnly()
+    {
+        // Bypass options validation by constructing strategy directly with zero bounds.
+        var options = CreateOptions();
+        options.InitialTimeout = TimeSpan.Zero;
+        options.MinTimeout = TimeSpan.Zero;
+        options.MaxTimeout = TimeSpan.FromSeconds(1);
+        options.MinimumSamples = 100;
+
+        var strategy = CreateStrategy(options);
+        var pipeline = strategy.AsPipeline();
+
+        await pipeline.ExecuteAsync(_ => new ValueTask(Task.CompletedTask));
+        strategy.Metrics.GetSnapshot().SuccessCount.ShouldBe(1);
+
+        // Failures under recordSuccessOnly are not recorded.
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await pipeline.ExecuteAsync<int>(_ => throw new InvalidOperationException("boom")));
+
+        strategy.Metrics.GetSnapshot().FailureCount.ShouldBe(0);
+        strategy.Metrics.GetSnapshot().SuccessCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Execute_TimeoutWithoutOnTimeoutCallback_StillThrows()
+    {
+        var options = CreateOptions();
+        options.InitialTimeout = TimeSpan.FromSeconds(1);
+        options.MinTimeout = TimeSpan.FromMilliseconds(100);
+        options.MaxTimeout = TimeSpan.FromSeconds(5);
+        options.MinimumSamples = 100;
+        options.OnTimeout = null;
+
+        var strategy = CreateStrategy(options);
+        var pipeline = strategy.AsPipeline();
+
+        await Should.ThrowAsync<TimeoutRejectedException>(async () =>
+        {
+            await pipeline.ExecuteAsync(async token =>
+            {
+                var delay = _timeProvider.Delay(TimeSpan.FromSeconds(5), token);
+                _timeProvider.Advance(TimeSpan.FromSeconds(1));
+                await delay;
+            });
+        });
+
+        strategy.Metrics.GetSnapshot().FailureCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public void OnSelfTuningTimeoutArguments_ExposesProperties()
+    {
+        var context = ResilienceContextPool.Shared.Get(TestCancellation.Token);
+        try
+        {
+            var args = new OnSelfTuningTimeoutArguments(context, TimeSpan.FromSeconds(3));
+            args.Context.ShouldBeSameAs(context);
+            args.Timeout.ShouldBe(TimeSpan.FromSeconds(3));
+        }
+        finally
+        {
+            ResilienceContextPool.Shared.Return(context);
+        }
+    }
+
     private SelfTuningTimeoutStrategyOptions CreateOptions() => new()
     {
         SamplingWindow = TimeSpan.FromMinutes(1),

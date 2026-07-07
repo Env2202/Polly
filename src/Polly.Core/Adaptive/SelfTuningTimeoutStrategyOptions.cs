@@ -54,7 +54,7 @@ public class SelfTuningTimeoutStrategyOptions : ResilienceStrategyOptions
     /// Gets or sets the multiplier applied to the observed latency percentile when computing the timeout.
     /// </summary>
     /// <value>The default value is <c>2.0</c>.</value>
-    [Range(1.0, 10.0)]
+    [Range(1.0, AdaptiveConstants.MaxTimeoutMultiplier)]
     public double TimeoutMultiplier { get; set; } = AdaptiveConstants.DefaultTimeoutMultiplier;
 
     /// <summary>
@@ -69,14 +69,14 @@ public class SelfTuningTimeoutStrategyOptions : ResilienceStrategyOptions
     /// Gets or sets the maximum number of latency samples retained in the window.
     /// </summary>
     /// <value>The default value is 256.</value>
-    [Range(1, 100_000)]
+    [Range(1, AdaptiveConstants.MaxSamples)]
     public int Capacity { get; set; } = AdaptiveConstants.DefaultCapacity;
 
     /// <summary>
     /// Gets or sets the minimum number of samples required before adaptive timeouts replace <see cref="InitialTimeout"/>.
     /// </summary>
     /// <value>The default value is 20.</value>
-    [Range(1, 100_000)]
+    [Range(1, AdaptiveConstants.MaxSamples)]
     public int MinimumSamples { get; set; } = AdaptiveConstants.DefaultMinimumSamples;
 
     /// <summary>

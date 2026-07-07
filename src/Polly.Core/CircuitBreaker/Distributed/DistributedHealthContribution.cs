@@ -13,6 +13,11 @@ public readonly struct DistributedHealthContribution
     /// <summary>
     /// Initializes a new instance of the <see cref="DistributedHealthContribution"/> struct.
     /// </summary>
+    /// <param name="instanceId">The reporting instance identifier.</param>
+    /// <param name="successCount">Successes observed in the local sampling window.</param>
+    /// <param name="failureCount">Failures observed in the local sampling window.</param>
+    /// <param name="consecutiveFailureCount">Current consecutive failure count on this instance.</param>
+    /// <param name="reportedAtUtc">When this contribution was produced (UTC).</param>
     public DistributedHealthContribution(
         string instanceId,
         int successCount,

@@ -13,6 +13,10 @@ public readonly struct DistributedHealthAggregate
     /// <summary>
     /// Initializes a new instance of the <see cref="DistributedHealthAggregate"/> struct.
     /// </summary>
+    /// <param name="successCount">Total successes across contributing instances.</param>
+    /// <param name="failureCount">Total failures across contributing instances.</param>
+    /// <param name="contributingInstances">How many instance contributions were included.</param>
+    /// <param name="maxConsecutiveFailures">Highest consecutive-failure streak among contributors.</param>
     public DistributedHealthAggregate(
         int successCount,
         int failureCount,

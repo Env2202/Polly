@@ -60,4 +60,104 @@ public class InMemoryDistributedCircuitStateStoreTests
         var expired = await store.GetAggregatedHealthAsync("k", time.GetUtcNow(), TimeSpan.FromSeconds(30), CancellationToken.None);
         expired.ContributingInstances.ShouldBe(0);
     }
+
+    [Fact]
+    public async Task TryUpdate_RejectsNonMonotonicVersion()
+    {
+        var store = new InMemoryDistributedCircuitStateStore();
+        var closed = DistributedCircuitSnapshot.Closed;
+        var bad = new DistributedCircuitSnapshot(
+            CircuitState.Open,
+            version: 5,
+            openUntilUtc: DateTimeOffset.UtcNow.AddSeconds(1),
+            updatedAtUtc: DateTimeOffset.UtcNow,
+            halfOpenLeaseOwner: null,
+            halfOpenLeaseExpiresUtc: null,
+            lastError: "x");
+
+        (await store.TryUpdateAsync("k", closed, bad, CancellationToken.None)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task TryUpdate_MissingKeyWithNonZeroExpected_Fails()
+    {
+        var store = new InMemoryDistributedCircuitStateStore();
+        var expected = new DistributedCircuitSnapshot(
+            CircuitState.Closed,
+            version: 3,
+            openUntilUtc: DateTimeOffset.MinValue,
+            updatedAtUtc: DateTimeOffset.MinValue,
+            halfOpenLeaseOwner: null,
+            halfOpenLeaseExpiresUtc: null,
+            lastError: null);
+        var next = expected.WithNextVersion(
+            CircuitState.Open,
+            DateTimeOffset.UtcNow.AddSeconds(1),
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            "e");
+
+        (await store.TryUpdateAsync("missing", expected, next, CancellationToken.None)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task GetAggregatedHealth_Empty_ReturnsZeros()
+    {
+        var store = new InMemoryDistributedCircuitStateStore();
+        var aggregate = await store.GetAggregatedHealthAsync("none", DateTimeOffset.UtcNow, TimeSpan.FromSeconds(1), CancellationToken.None);
+        aggregate.Throughput.ShouldBe(0);
+        aggregate.FailureRate.ShouldBe(0);
+        aggregate.ContributingInstances.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Clear_AndClearHealth_RemoveState()
+    {
+        var store = new InMemoryDistributedCircuitStateStore();
+        var open = DistributedCircuitSnapshot.Closed.WithNextVersion(
+            CircuitState.Open,
+            DateTimeOffset.UtcNow.AddSeconds(1),
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            "e");
+        (await store.TryUpdateAsync("k", DistributedCircuitSnapshot.Closed, open, CancellationToken.None)).ShouldBeTrue();
+        await store.PublishHealthAsync("k", new DistributedHealthContribution("a", 1, 0, 0, DateTimeOffset.UtcNow), CancellationToken.None);
+
+        await store.ClearHealthAsync("k", CancellationToken.None);
+        var afterClearHealth = await store.GetAggregatedHealthAsync("k", DateTimeOffset.UtcNow, TimeSpan.FromMinutes(1), CancellationToken.None);
+        afterClearHealth.ContributingInstances.ShouldBe(0);
+
+        store.Clear();
+        (await store.GetAsync("k", CancellationToken.None)).ShouldBeNull();
+    }
+
+    [Fact]
+    public void DistributedTypes_ExposeComputedProperties()
+    {
+        var contribution = new DistributedHealthContribution("id", 3, 2, 1, DateTimeOffset.UtcNow);
+        contribution.Throughput.ShouldBe(5);
+
+        Should.Throw<ArgumentNullException>(() => new DistributedHealthContribution(null!, 0, 0, 0, DateTimeOffset.UtcNow));
+
+        var snapshot = new DistributedCircuitSnapshot(
+            CircuitState.HalfOpen,
+            2,
+            DateTimeOffset.UtcNow.AddSeconds(1),
+            DateTimeOffset.UtcNow,
+            "owner",
+            DateTimeOffset.UtcNow.AddSeconds(2),
+            "err");
+        snapshot.HalfOpenLeaseExpiresUtc.ShouldNotBeNull();
+        snapshot.LastError.ShouldBe("err");
+
+        var empty = new DistributedHealthAggregate(0, 0, 0, 0);
+        empty.FailureRate.ShouldBe(0);
+        empty.Throughput.ShouldBe(0);
+
+        var nonEmpty = new DistributedHealthAggregate(2, 2, 1, 1);
+        nonEmpty.FailureRate.ShouldBe(0.5);
+        nonEmpty.Throughput.ShouldBe(4);
+    }
 }

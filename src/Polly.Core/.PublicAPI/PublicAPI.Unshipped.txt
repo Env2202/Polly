@@ -1,4 +1,10 @@
 #nullable enable
+Polly.CircuitBreaker.CircuitBreakerStrategyOptions<TResult>.SlowCallRateThreshold.set -> void
+Polly.CircuitBreaker.CircuitBreakerStrategyOptions<TResult>.SlowCallRateThreshold.get -> double?
+Polly.CircuitBreaker.CircuitBreakerStrategyOptions<TResult>.SlowCallDurationThreshold.set -> void
+Polly.CircuitBreaker.CircuitBreakerStrategyOptions<TResult>.SlowCallDurationThreshold.get -> System.TimeSpan?
+Polly.CircuitBreaker.CircuitBreakerStrategyOptions<TResult>.ConsecutiveFailureThreshold.set -> void
+Polly.CircuitBreaker.CircuitBreakerStrategyOptions<TResult>.ConsecutiveFailureThreshold.get -> int?
 Polly.Adaptive.OnSelfTuningRetryArguments<TResult>
 Polly.Adaptive.OnSelfTuningRetryArguments<TResult>.AttemptNumber.get -> int
 Polly.Adaptive.OnSelfTuningRetryArguments<TResult>.Context.get -> Polly.ResilienceContext!
@@ -138,7 +144,7 @@ Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy.FailClosed = 
 Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy.FailOpen = 2 -> Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy
 Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy.PreferLastKnownState = 0 -> Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy
 Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot
-Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.Closed.get -> Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot
+static Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.Closed.get -> Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot
 Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.DistributedCircuitSnapshot() -> void
 Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.DistributedCircuitSnapshot(Polly.CircuitBreaker.CircuitState state, long version, System.DateTimeOffset openUntilUtc, System.DateTimeOffset updatedAtUtc, string? halfOpenLeaseOwner, System.DateTimeOffset? halfOpenLeaseExpiresUtc, string? lastError) -> void
 Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.HalfOpenLeaseExpiresUtc.get -> System.DateTimeOffset?
@@ -172,7 +178,7 @@ Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.ClearHealthAsync(
 Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.GetAggregatedHealthAsync(string! circuitKey, System.DateTimeOffset utcNow, System.TimeSpan maxAge, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Polly.CircuitBreaker.Distributed.DistributedHealthAggregate>
 Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.GetAsync(string! circuitKey, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot?>
 Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.PublishHealthAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedHealthContribution contribution, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
-Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.TryUpdateAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot expected, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
+Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.TryUpdateAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot expected, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot updated, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.Clear() -> void
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.ClearHealthAsync(string! circuitKey, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
@@ -180,7 +186,7 @@ Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.GetAggrega
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.GetAsync(string! circuitKey, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot?>
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.InMemoryDistributedCircuitStateStore() -> void
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.PublishHealthAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedHealthContribution contribution, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
-Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.TryUpdateAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot expected, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.TryUpdateAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot expected, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot updated, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
 Polly.DistributedCircuitBreakerResiliencePipelineBuilderExtensions
 static Polly.DistributedCircuitBreakerResiliencePipelineBuilderExtensions.AddDistributedCircuitBreaker(this Polly.ResiliencePipelineBuilder! builder, Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions! options) -> Polly.ResiliencePipelineBuilder!
 static Polly.DistributedCircuitBreakerResiliencePipelineBuilderExtensions.AddDistributedCircuitBreaker<TResult>(this Polly.ResiliencePipelineBuilder<TResult>! builder, Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>! options) -> Polly.ResiliencePipelineBuilder<TResult>!

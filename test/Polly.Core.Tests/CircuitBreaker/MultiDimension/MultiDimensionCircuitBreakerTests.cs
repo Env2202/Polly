@@ -19,6 +19,44 @@ public class MultiDimensionCircuitBreakerTests
     #region Health metrics — three dimensions in sync
 
     [Fact]
+    public void HealthMetrics_BaseConfigureSlowCall_IsNoOp()
+    {
+        var metrics = new TestHealthMetrics(TimeProvider.System);
+        metrics.ConfigureSlowCall(TimeSpan.FromMilliseconds(100));
+        metrics.ConfigureSlowCall(null);
+        metrics.GetHealthInfo().Throughput.ShouldBe(0);
+    }
+
+    [Fact]
+    public void HealthMetrics_Create_UsesSingleWindowForShortSampling()
+    {
+        var metrics = HealthMetrics.Create(TimeSpan.FromMilliseconds(50), TimeProvider.System);
+        metrics.ShouldBeOfType<SingleHealthMetrics>();
+    }
+
+    private sealed class TestHealthMetrics : HealthMetrics
+    {
+        public TestHealthMetrics(TimeProvider timeProvider)
+            : base(timeProvider)
+        {
+        }
+
+        public override void IncrementSuccess(TimeSpan? duration = null)
+        {
+        }
+
+        public override void IncrementFailure()
+        {
+        }
+
+        public override void Reset()
+        {
+        }
+
+        public override HealthInfo GetHealthInfo() => new(0, 0, 0);
+    }
+
+    [Fact]
     public void SingleHealthMetrics_TracksSlowCallsAndConsecutiveIndependently()
     {
         var time = new FakeTimeProvider();

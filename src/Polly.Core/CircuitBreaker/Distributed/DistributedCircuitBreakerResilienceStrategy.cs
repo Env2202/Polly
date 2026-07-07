@@ -46,7 +46,9 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
         _telemetry = telemetry;
         _shouldHandle = options.ShouldHandle;
         _circuitKey = options.CircuitKey;
-        _instanceId = string.IsNullOrWhiteSpace(options.InstanceId) ? Guid.NewGuid().ToString("N") : options.InstanceId;
+        _instanceId = string.IsNullOrWhiteSpace(options.InstanceId)
+            ? Guid.NewGuid().ToString("N", System.Globalization.CultureInfo.InvariantCulture)
+            : options.InstanceId;
         _breakDuration = options.BreakDuration;
         _samplingDuration = options.SamplingDuration;
         _failureRatio = options.FailureRatio;
@@ -91,6 +93,9 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
             }
         }
     }
+
+    private static bool IsHalfOpenLeaseExpired(DistributedCircuitSnapshot snapshot, DateTimeOffset now) =>
+        snapshot.HalfOpenLeaseExpiresUtc is { } expires && now >= expires;
 
     protected internal override async ValueTask<Outcome<T>> ExecuteCore<TState>(
         Func<ResilienceContext, TState, ValueTask<Outcome<T>>> callback,
@@ -156,11 +161,12 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
                     return null; // probe allowed
                 }
 
-                // Another instance holds the lease or won the race — reject.
+                // Another instance holds the lease or won the race — reject,
+                // unless the circuit recovered (Closed) or we own the half-open lease.
                 snapshot = await RefreshStateAsync(context.CancellationToken, force: true)
                     .ConfigureAwait(context.ContinueOnCapturedContext);
-                if (snapshot.State is CircuitState.Closed or CircuitState.HalfOpen
-                    && IsHalfOpenOwner(snapshot))
+                if (snapshot.State == CircuitState.Closed
+                    || (snapshot.State == CircuitState.HalfOpen && IsHalfOpenOwner(snapshot)))
                 {
                     return null;
                 }
@@ -217,6 +223,7 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
                     catch (Exception)
 #pragma warning restore CA1031
                     {
+                        // Intentionally ignored: clearing health after close is best-effort.
                     }
 
                     var args = new OnCircuitClosedArguments<T>(ctx, outcome, isManual: false);
@@ -228,6 +235,7 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
                         await _onClosed(args).ConfigureAwait(ctx.ContinueOnCapturedContext);
                     }
                 }).ConfigureAwait(context.ContinueOnCapturedContext);
+
             // Do not re-evaluate aggregated health on the same success that closed the circuit.
             return;
         }
@@ -456,7 +464,7 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
         }
     }
 
-    private async ValueTask RaiseOpenedAsync(ResilienceContext context, Outcome<T> outcome, DistributedCircuitSnapshot applied)
+    private async ValueTask RaiseOpenedAsync(ResilienceContext context, Outcome<T> outcome, DistributedCircuitSnapshot _)
     {
         var args = new OnCircuitOpenedArguments<T>(context, outcome, _breakDuration, isManual: false);
         _telemetry.Report<OnCircuitOpenedArguments<T>, T>(
@@ -533,7 +541,8 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
                 _localSuccesses = 0;
                 _localFailures = 0;
                 _localWindowStarted = now;
-                // keep consecutive counter across window reset (matches multi-dimension CB intent)
+
+                // Keep consecutive counter across window reset (matches multi-dimension CB intent).
             }
 
             if (success)
@@ -585,15 +594,12 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
         }
     }
 
+    // Extend open window by allowed skew so lagging clocks do not probe early.
     private bool IsStillOpen(DistributedCircuitSnapshot snapshot, DateTimeOffset now) =>
-        // Extend open window by allowed skew so lagging clocks do not probe early.
         now < snapshot.OpenUntilUtc + _allowedClockSkew;
 
     private bool IsHalfOpenOwner(DistributedCircuitSnapshot snapshot) =>
         string.Equals(snapshot.HalfOpenLeaseOwner, _instanceId, StringComparison.Ordinal);
-
-    private static bool IsHalfOpenLeaseExpired(DistributedCircuitSnapshot snapshot, DateTimeOffset now) =>
-        snapshot.HalfOpenLeaseExpiresUtc is { } expires && now >= expires;
 
     private Outcome<T> Reject(ExecutionRejectedException exception, DistributedCircuitSnapshot snapshot, DateTimeOffset now)
     {

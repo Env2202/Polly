@@ -18,9 +18,15 @@ internal static class AdaptiveConstants
 
     public const int DefaultMinimumSamples = 20;
 
+    /// <summary>Upper bound for sliding-window capacity and minimum-sample options.</summary>
+    public const int MaxSamples = 100_000;
+
     public const double DefaultLatencyPercentile = 0.99;
 
     public const double DefaultTimeoutMultiplier = 2.0;
+
+    /// <summary>Upper bound for <see cref="SelfTuningTimeoutStrategyOptions.TimeoutMultiplier"/>.</summary>
+    public const double MaxTimeoutMultiplier = 10.0;
 
     public const int DefaultInitialRetryAttempts = 3;
 

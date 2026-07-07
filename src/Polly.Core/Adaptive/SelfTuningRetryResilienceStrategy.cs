@@ -77,47 +77,25 @@ internal sealed class SelfTuningRetryResilienceStrategy<T> : ResilienceStrategy<
         }
         else
         {
+            // failureRate and threshold are both in [0, 1], so severity is in [0, 1]
+            // and the rounded attempt count stays within [min, max].
             var severity = threshold >= 1 ? 1.0 : (failureRate - threshold) / (1.0 - threshold);
-            severity = Clamp01(severity);
             attempts = (int)Math.Round(_maxRetryAttempts - (severity * (_maxRetryAttempts - _minRetryAttempts)));
-            if (attempts < _minRetryAttempts)
-            {
-                attempts = _minRetryAttempts;
-            }
-            else if (attempts > _maxRetryAttempts)
-            {
-                attempts = _maxRetryAttempts;
-            }
-
             baseDelay = Lerp(Midpoint(_minDelay, _maxDelay), _maxDelay, severity);
         }
 
         return (attempts, ClampDelay(baseDelay));
     }
 
+#pragma warning disable S109 // Magic numbers should not be used — divide-by-two midpoint is intentional
     private static TimeSpan Midpoint(TimeSpan a, TimeSpan b) =>
         TimeSpan.FromTicks(a.Ticks + ((b.Ticks - a.Ticks) / 2));
+#pragma warning restore S109
 
     private static TimeSpan Lerp(TimeSpan from, TimeSpan to, double t)
     {
-        t = Clamp01(t);
         var ticks = from.Ticks + (long)((to.Ticks - from.Ticks) * t);
         return TimeSpan.FromTicks(ticks);
-    }
-
-    private static double Clamp01(double value)
-    {
-        if (value < 0)
-        {
-            return 0;
-        }
-
-        if (value > 1)
-        {
-            return 1;
-        }
-
-        return value;
     }
 
     protected internal override async ValueTask<Outcome<T>> ExecuteCore<TState>(
@@ -223,3 +201,4 @@ internal sealed class SelfTuningRetryResilienceStrategy<T> : ResilienceStrategy<
         return value;
     }
 }
+

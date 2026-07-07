@@ -17,6 +17,13 @@ public readonly struct DistributedCircuitSnapshot
     /// <summary>
     /// Initializes a new instance of the <see cref="DistributedCircuitSnapshot"/> struct.
     /// </summary>
+    /// <param name="state">The circuit state.</param>
+    /// <param name="version">The monotonic version used for compare-and-swap updates.</param>
+    /// <param name="openUntilUtc">UTC time until which the circuit should remain open.</param>
+    /// <param name="updatedAtUtc">UTC time of the last successful state write.</param>
+    /// <param name="halfOpenLeaseOwner">Instance id holding the half-open probe lease, if any.</param>
+    /// <param name="halfOpenLeaseExpiresUtc">When the half-open lease expires (UTC), if any.</param>
+    /// <param name="lastError">Short description of the last error that opened the circuit, if any.</param>
     public DistributedCircuitSnapshot(
         CircuitState state,
         long version,
@@ -79,6 +86,13 @@ public readonly struct DistributedCircuitSnapshot
     /// <summary>
     /// Creates a successor snapshot with an incremented version.
     /// </summary>
+    /// <param name="state">The circuit state for the successor snapshot.</param>
+    /// <param name="openUntilUtc">UTC time until which the circuit should remain open.</param>
+    /// <param name="updatedAtUtc">UTC time of this state write.</param>
+    /// <param name="halfOpenLeaseOwner">Instance id holding the half-open probe lease, if any.</param>
+    /// <param name="halfOpenLeaseExpiresUtc">When the half-open lease expires (UTC), if any.</param>
+    /// <param name="lastError">Short description of the last error that opened the circuit, if any.</param>
+    /// <returns>A new snapshot with <see cref="Version"/> equal to this instance's version plus one.</returns>
     public DistributedCircuitSnapshot WithNextVersion(
         CircuitState state,
         DateTimeOffset openUntilUtc,

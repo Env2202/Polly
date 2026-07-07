@@ -114,8 +114,8 @@ public class DistributedCircuitBreakerStrategyOptions<TResult> : ResilienceStrat
     /// Gets or sets the maximum number of compare-and-swap attempts for a state transition.
     /// </summary>
     /// <value>Default is 8.</value>
-    [Range(1, 100)]
-    public int MaxCasAttempts { get; set; } = 8;
+    [Range(1, DistributedCircuitBreakerConstants.MaxCasAttemptsLimit)]
+    public int MaxCasAttempts { get; set; } = DistributedCircuitBreakerConstants.DefaultMaxCasAttempts;
 
     /// <summary>
     /// Gets or sets the predicate that determines whether an outcome is a handled failure.

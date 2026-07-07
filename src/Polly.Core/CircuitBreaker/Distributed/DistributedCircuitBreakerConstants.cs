@@ -10,6 +10,14 @@ internal static class DistributedCircuitBreakerConstants
 
     public const string OnHalfOpenEvent = "OnCircuitHalfOpened";
 
+    public const double DefaultFailureRatio = 0.5;
+
+    public const int DefaultMinimumThroughput = 20;
+
+    public const int DefaultMaxCasAttempts = 8;
+
+    public const int MaxCasAttemptsLimit = 100;
+
     public static readonly TimeSpan DefaultBreakDuration = TimeSpan.FromSeconds(5);
 
     public static readonly TimeSpan DefaultSamplingDuration = TimeSpan.FromSeconds(30);
@@ -19,8 +27,4 @@ internal static class DistributedCircuitBreakerConstants
     public static readonly TimeSpan DefaultHalfOpenLeaseDuration = TimeSpan.FromSeconds(5);
 
     public static readonly TimeSpan DefaultStateRefreshInterval = TimeSpan.FromMilliseconds(100);
-
-    public const double DefaultFailureRatio = 0.5;
-
-    public const int DefaultMinimumThroughput = 20;
 }

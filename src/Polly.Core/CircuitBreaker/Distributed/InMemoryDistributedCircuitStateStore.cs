@@ -32,13 +32,13 @@ public sealed class InMemoryDistributedCircuitStateStore : IDistributedCircuitSt
     public ValueTask<bool> TryUpdateAsync(
         string circuitKey,
         DistributedCircuitSnapshot expected,
-        DistributedCircuitSnapshot next,
+        DistributedCircuitSnapshot updated,
         CancellationToken cancellationToken)
     {
         Guard.NotNull(circuitKey);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (next.Version != expected.Version + 1)
+        if (updated.Version != expected.Version + 1)
         {
             return new ValueTask<bool>(false);
         }
@@ -57,7 +57,7 @@ public sealed class InMemoryDistributedCircuitStateStore : IDistributedCircuitSt
                 return new ValueTask<bool>(false);
             }
 
-            _states[circuitKey] = next;
+            _states[circuitKey] = updated;
             return new ValueTask<bool>(true);
         }
     }

@@ -105,6 +105,17 @@ public class SlidingWindowMetricsTests
     }
 
     [Fact]
+    public void Record_NegativeDuration_TreatedAsZero()
+    {
+        var metrics = new SlidingWindowMetrics(TimeSpan.FromSeconds(30), 10);
+        metrics.Record(TimeSpan.FromMilliseconds(-5), success: true);
+        var snapshot = metrics.GetSnapshot();
+        snapshot.SampleCount.ShouldBe(1);
+        snapshot.MinDuration.ShouldBe(TimeSpan.Zero);
+        snapshot.MaxDuration.ShouldBe(TimeSpan.Zero);
+    }
+
+    [Fact]
     public void ConcurrentRecord_IsThreadSafe()
     {
         var metrics = new SlidingWindowMetrics(TimeSpan.FromMinutes(1), 10_000);

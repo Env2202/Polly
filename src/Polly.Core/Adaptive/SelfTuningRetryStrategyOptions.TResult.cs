@@ -103,14 +103,14 @@ public class SelfTuningRetryStrategyOptions<TResult> : ResilienceStrategyOptions
     /// Gets or sets the maximum number of outcome samples retained in the window.
     /// </summary>
     /// <value>The default value is 256.</value>
-    [Range(1, 100_000)]
+    [Range(1, AdaptiveConstants.MaxSamples)]
     public int Capacity { get; set; } = AdaptiveConstants.DefaultCapacity;
 
     /// <summary>
     /// Gets or sets the minimum number of samples required before adaptive parameters replace the initial values.
     /// </summary>
     /// <value>The default value is 20.</value>
-    [Range(1, 100_000)]
+    [Range(1, AdaptiveConstants.MaxSamples)]
     public int MinimumSamples { get; set; } = AdaptiveConstants.DefaultMinimumSamples;
 
     /// <summary>

@@ -69,13 +69,13 @@ internal sealed class SelfTuningTimeoutResilienceStrategy : ResilienceStrategy
             return Clamp(_initialTimeout);
         }
 
-        var scaledTicks = (long)(percentile.Ticks * _timeoutMultiplier);
-        if (scaledTicks < 0)
+        // Guard against overflow when scaling large latencies.
+        if (_timeoutMultiplier > 1 && percentile.Ticks > (long)(long.MaxValue / _timeoutMultiplier))
         {
-            // overflow guard
             return _maxTimeout;
         }
 
+        var scaledTicks = (long)(percentile.Ticks * _timeoutMultiplier);
         return Clamp(TimeSpan.FromTicks(scaledTicks));
     }
 

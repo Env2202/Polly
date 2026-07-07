@@ -93,7 +93,9 @@ public sealed class SlidingWindowMetrics
     /// Returns a snapshot of the current window statistics.
     /// </summary>
     /// <returns>An immutable snapshot of metrics.</returns>
+#pragma warning disable S4049 // Method is intentional to mirror other metrics APIs (e.g. GetLatencyPercentile).
     public SlidingWindowSnapshot GetSnapshot()
+#pragma warning restore S4049
     {
         lock (_sync)
         {
@@ -179,16 +181,9 @@ public sealed class SlidingWindowMetrics
             // Sort only the live prefix of the scratch buffer.
             Array.Sort(_percentileScratch, 0, _count);
 
-            // Nearest-rank method: index = ceil(p * N) - 1, clamped.
+            // Nearest-rank method: index = ceil(p * N) - 1, clamped into [0, N-1].
             var rank = (int)Math.Ceiling(percentile * _count) - 1;
-            if (rank < 0)
-            {
-                rank = 0;
-            }
-            else if (rank >= _count)
-            {
-                rank = _count - 1;
-            }
+            rank = Math.Max(0, Math.Min(rank, _count - 1));
 
             return TimeSpan.FromTicks(_percentileScratch[rank]);
         }
