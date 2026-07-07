@@ -62,7 +62,7 @@ public class CircuitBreakerResilienceStrategyTests : IDisposable
         Should.NotThrow(() => strategy.Execute(_ => 0));
 
         _behavior.Received().OnCircuitClosed();
-        _behavior.Received().OnActionSuccess(CircuitState.Closed);
+        _behavior.Received().OnActionSuccess(CircuitState.Closed, Arg.Any<TimeSpan?>());
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public class CircuitBreakerResilienceStrategyTests : IDisposable
 
         strategy.Execute(_ => 0, CancellationToken).ShouldBe(0);
 
-        _behavior.Received(1).OnActionSuccess(CircuitState.Closed);
+        _behavior.Received(1).OnActionSuccess(CircuitState.Closed, Arg.Any<TimeSpan?>());
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public class CircuitBreakerResilienceStrategyTests : IDisposable
 
         Should.Throw<ArgumentException>(() => strategy.Execute<int>(_ => throw new ArgumentException()));
 
-        _behavior.Received(1).OnActionSuccess(CircuitState.Closed);
+        _behavior.Received(1).OnActionSuccess(CircuitState.Closed, Arg.Any<TimeSpan?>());
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class CircuitBreakerResilienceStrategyTests : IDisposable
         var outcome = await strategy.ExecuteOutcomeAsync<int, string>((_, _) => throw new ArgumentException(), new(), "dummy-state");
         outcome.Exception.ShouldBeOfType<ArgumentException>();
 
-        _behavior.Received(1).OnActionSuccess(CircuitState.Closed);
+        _behavior.Received(1).OnActionSuccess(CircuitState.Closed, Arg.Any<TimeSpan?>());
     }
 
     public void Dispose() => _controller.Dispose();
@@ -138,7 +138,7 @@ public class CircuitBreakerResilienceStrategyTests : IDisposable
 
         Should.NotThrow(() => Create().Execute(_ => 0));
 
-        _behavior.Received(1).OnActionSuccess(CircuitState.Closed);
+        _behavior.Received(1).OnActionSuccess(CircuitState.Closed, Arg.Any<TimeSpan?>());
     }
 
     private ResiliencePipeline<int> Create()

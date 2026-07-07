@@ -72,10 +72,15 @@ public static class CircuitBreakerResiliencePipelineBuilderExtensions
         StrategyBuilderContext context,
         CircuitBreakerStrategyOptions<TResult> options)
     {
+        var metrics = HealthMetrics.Create(options.SamplingDuration, context.TimeProvider);
+        metrics.ConfigureSlowCall(options.SlowCallDurationThreshold);
+
         var behavior = new AdvancedCircuitBehavior(
             options.FailureRatio,
             options.MinimumThroughput,
-            HealthMetrics.Create(options.SamplingDuration, context.TimeProvider));
+            metrics,
+            options.SlowCallRateThreshold,
+            options.ConsecutiveFailureThreshold);
 
         var controller = new CircuitStateController<TResult>(
             options.BreakDuration,
@@ -91,7 +96,8 @@ public static class CircuitBreakerResiliencePipelineBuilderExtensions
             options.ShouldHandle!,
             controller,
             options.StateProvider,
-            options.ManualControl);
+            options.ManualControl,
+            context.TimeProvider);
     }
 }
 

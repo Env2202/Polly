@@ -209,7 +209,7 @@ public class CircuitStateControllerTests
             await controller.OnUnhandledOutcomeAsync(Outcome.FromResult(0), context);
             controller.CircuitState.ShouldBe(CircuitState.Closed);
 
-            _circuitBehavior.Received().OnActionSuccess(CircuitState.HalfOpen);
+            _circuitBehavior.Received().OnActionSuccess(CircuitState.HalfOpen, Arg.Any<TimeSpan?>());
             _circuitBehavior.Received().OnCircuitClosed();
         }
         else
@@ -332,7 +332,7 @@ public class CircuitStateControllerTests
         // assert
         controller.CircuitState.ShouldBe(expectedState);
 
-        _circuitBehavior.Received().OnActionSuccess(state);
+        _circuitBehavior.Received().OnActionSuccess(state, Arg.Any<TimeSpan?>());
         if (expectedState == CircuitState.Closed && state != CircuitState.Closed)
         {
             _circuitBehavior.Received().OnCircuitClosed();
@@ -528,7 +528,7 @@ public class CircuitStateControllerTests
         await controller.OnUnhandledOutcomeAsync(Outcome.FromResult(0), context);
         controller.CircuitState.ShouldBe(CircuitState.Closed);
 
-        _circuitBehavior.Received().OnActionSuccess(CircuitState.HalfOpen);
+        _circuitBehavior.Received().OnActionSuccess(CircuitState.HalfOpen, Arg.Any<TimeSpan?>());
         _circuitBehavior.Received().OnCircuitClosed();
     }
 
@@ -569,7 +569,7 @@ public class CircuitStateControllerTests
         await controller.OnUnhandledOutcomeAsync(Outcome.FromResult(0), context);
         controller.CircuitState.ShouldBe(CircuitState.Closed);
 
-        _circuitBehavior.Received().OnActionSuccess(CircuitState.HalfOpen);
+        _circuitBehavior.Received().OnActionSuccess(CircuitState.HalfOpen, Arg.Any<TimeSpan?>());
         _circuitBehavior.Received().OnCircuitClosed();
     }
 

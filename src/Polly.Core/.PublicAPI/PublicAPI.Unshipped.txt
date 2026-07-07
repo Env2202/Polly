@@ -1,1 +1,186 @@
-﻿#nullable enable
+#nullable enable
+Polly.Adaptive.OnSelfTuningRetryArguments<TResult>
+Polly.Adaptive.OnSelfTuningRetryArguments<TResult>.AttemptNumber.get -> int
+Polly.Adaptive.OnSelfTuningRetryArguments<TResult>.Context.get -> Polly.ResilienceContext!
+Polly.Adaptive.OnSelfTuningRetryArguments<TResult>.Duration.get -> System.TimeSpan
+Polly.Adaptive.OnSelfTuningRetryArguments<TResult>.MaxRetryAttempts.get -> int
+Polly.Adaptive.OnSelfTuningRetryArguments<TResult>.OnSelfTuningRetryArguments() -> void
+Polly.Adaptive.OnSelfTuningRetryArguments<TResult>.OnSelfTuningRetryArguments(Polly.ResilienceContext! context, Polly.Outcome<TResult> outcome, int attemptNumber, System.TimeSpan retryDelay, int maxRetryAttempts, System.TimeSpan duration) -> void
+Polly.Adaptive.OnSelfTuningRetryArguments<TResult>.Outcome.get -> Polly.Outcome<TResult>
+Polly.Adaptive.OnSelfTuningRetryArguments<TResult>.RetryDelay.get -> System.TimeSpan
+Polly.Adaptive.OnSelfTuningTimeoutArguments
+Polly.Adaptive.OnSelfTuningTimeoutArguments.Context.get -> Polly.ResilienceContext!
+Polly.Adaptive.OnSelfTuningTimeoutArguments.OnSelfTuningTimeoutArguments() -> void
+Polly.Adaptive.OnSelfTuningTimeoutArguments.OnSelfTuningTimeoutArguments(Polly.ResilienceContext! context, System.TimeSpan timeout) -> void
+Polly.Adaptive.OnSelfTuningTimeoutArguments.Timeout.get -> System.TimeSpan
+Polly.Adaptive.SelfTuningRetryStrategyOptions
+Polly.Adaptive.SelfTuningRetryStrategyOptions.SelfTuningRetryStrategyOptions() -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.BackoffType.get -> Polly.DelayBackoffType
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.BackoffType.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.Capacity.get -> int
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.Capacity.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.HighFailureRateThreshold.get -> double
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.HighFailureRateThreshold.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.InitialDelay.get -> System.TimeSpan
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.InitialDelay.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.InitialRetryAttempts.get -> int
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.InitialRetryAttempts.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.MaxDelay.get -> System.TimeSpan
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.MaxDelay.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.MaxRetryAttempts.get -> int
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.MaxRetryAttempts.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.Metrics.get -> Polly.Adaptive.SlidingWindowMetrics?
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.Metrics.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.MinDelay.get -> System.TimeSpan
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.MinDelay.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.MinimumSamples.get -> int
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.MinimumSamples.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.MinRetryAttempts.get -> int
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.MinRetryAttempts.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.OnRetry.get -> System.Func<Polly.Adaptive.OnSelfTuningRetryArguments<TResult>, System.Threading.Tasks.ValueTask>?
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.OnRetry.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.SamplingWindow.get -> System.TimeSpan
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.SamplingWindow.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.SelfTuningRetryStrategyOptions() -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.ShouldHandle.get -> System.Func<Polly.Retry.RetryPredicateArguments<TResult>, System.Threading.Tasks.ValueTask<bool>>!
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.ShouldHandle.set -> void
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.UseJitter.get -> bool
+Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>.UseJitter.set -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.Capacity.get -> int
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.Capacity.set -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.InitialTimeout.get -> System.TimeSpan
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.InitialTimeout.set -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.LatencyPercentile.get -> double
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.LatencyPercentile.set -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.MaxTimeout.get -> System.TimeSpan
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.MaxTimeout.set -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.Metrics.get -> Polly.Adaptive.SlidingWindowMetrics?
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.Metrics.set -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.MinimumSamples.get -> int
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.MinimumSamples.set -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.MinTimeout.get -> System.TimeSpan
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.MinTimeout.set -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.OnTimeout.get -> System.Func<Polly.Adaptive.OnSelfTuningTimeoutArguments, System.Threading.Tasks.ValueTask>?
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.OnTimeout.set -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.SamplingWindow.get -> System.TimeSpan
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.SamplingWindow.set -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.SelfTuningTimeoutStrategyOptions() -> void
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.TimeoutMultiplier.get -> double
+Polly.Adaptive.SelfTuningTimeoutStrategyOptions.TimeoutMultiplier.set -> void
+Polly.Adaptive.SlidingWindowMetrics
+Polly.Adaptive.SlidingWindowMetrics.Capacity.get -> int
+Polly.Adaptive.SlidingWindowMetrics.GetLatencyPercentile(double percentile) -> System.TimeSpan
+Polly.Adaptive.SlidingWindowMetrics.GetSnapshot() -> Polly.Adaptive.SlidingWindowSnapshot
+Polly.Adaptive.SlidingWindowMetrics.Record(System.TimeSpan duration, bool success) -> void
+Polly.Adaptive.SlidingWindowMetrics.Reset() -> void
+Polly.Adaptive.SlidingWindowMetrics.SamplingWindow.get -> System.TimeSpan
+Polly.Adaptive.SlidingWindowMetrics.SlidingWindowMetrics(System.TimeSpan samplingWindow, int capacity, System.TimeProvider? timeProvider = null) -> void
+Polly.Adaptive.SlidingWindowSnapshot
+Polly.Adaptive.SlidingWindowSnapshot.AverageDuration.get -> System.TimeSpan
+Polly.Adaptive.SlidingWindowSnapshot.FailureCount.get -> int
+Polly.Adaptive.SlidingWindowSnapshot.FailureRate.get -> double
+Polly.Adaptive.SlidingWindowSnapshot.MaxDuration.get -> System.TimeSpan
+Polly.Adaptive.SlidingWindowSnapshot.MinDuration.get -> System.TimeSpan
+Polly.Adaptive.SlidingWindowSnapshot.SampleCount.get -> int
+Polly.Adaptive.SlidingWindowSnapshot.SlidingWindowSnapshot() -> void
+Polly.Adaptive.SlidingWindowSnapshot.SlidingWindowSnapshot(int sampleCount, int successCount, int failureCount, System.TimeSpan averageDuration, System.TimeSpan minDuration, System.TimeSpan maxDuration, double successRate, double failureRate) -> void
+Polly.Adaptive.SlidingWindowSnapshot.SuccessCount.get -> int
+Polly.Adaptive.SlidingWindowSnapshot.SuccessRate.get -> double
+Polly.SelfTuningRetryResiliencePipelineBuilderExtensions
+Polly.SelfTuningTimeoutResiliencePipelineBuilderExtensions
+static Polly.SelfTuningRetryResiliencePipelineBuilderExtensions.AddSelfTuningRetry(this Polly.ResiliencePipelineBuilder! builder, Polly.Adaptive.SelfTuningRetryStrategyOptions! options) -> Polly.ResiliencePipelineBuilder!
+static Polly.SelfTuningRetryResiliencePipelineBuilderExtensions.AddSelfTuningRetry<TResult>(this Polly.ResiliencePipelineBuilder<TResult>! builder, Polly.Adaptive.SelfTuningRetryStrategyOptions<TResult>! options) -> Polly.ResiliencePipelineBuilder<TResult>!
+static Polly.SelfTuningTimeoutResiliencePipelineBuilderExtensions.AddSelfTuningTimeout<TBuilder>(this TBuilder! builder, Polly.Adaptive.SelfTuningTimeoutStrategyOptions! options) -> TBuilder!
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions.DistributedCircuitBreakerStrategyOptions() -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.AllowedClockSkew.get -> System.TimeSpan
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.AllowedClockSkew.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.BreakDuration.get -> System.TimeSpan
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.BreakDuration.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.CircuitKey.get -> string!
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.CircuitKey.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.ConsecutiveFailureThreshold.get -> int?
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.ConsecutiveFailureThreshold.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.DistributedCircuitBreakerStrategyOptions() -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.FailureRatio.get -> double
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.FailureRatio.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.HalfOpenLeaseDuration.get -> System.TimeSpan
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.HalfOpenLeaseDuration.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.InstanceId.get -> string!
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.InstanceId.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.MaxCasAttempts.get -> int
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.MaxCasAttempts.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.MinimumThroughput.get -> int
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.MinimumThroughput.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.OnClosed.get -> System.Func<Polly.CircuitBreaker.OnCircuitClosedArguments<TResult>, System.Threading.Tasks.ValueTask>?
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.OnClosed.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.OnHalfOpened.get -> System.Func<Polly.CircuitBreaker.OnCircuitHalfOpenedArguments, System.Threading.Tasks.ValueTask>?
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.OnHalfOpened.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.OnOpened.get -> System.Func<Polly.CircuitBreaker.OnCircuitOpenedArguments<TResult>, System.Threading.Tasks.ValueTask>?
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.OnOpened.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.PartitionPolicy.get -> Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.PartitionPolicy.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.SamplingDuration.get -> System.TimeSpan
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.SamplingDuration.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.ShouldHandle.get -> System.Func<Polly.CircuitBreaker.CircuitBreakerPredicateArguments<TResult>, System.Threading.Tasks.ValueTask<bool>>!
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.ShouldHandle.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.StateProvider.get -> Polly.CircuitBreaker.CircuitBreakerStateProvider?
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.StateProvider.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.StateRefreshInterval.get -> System.TimeSpan
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.StateRefreshInterval.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.StateStore.get -> Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore?
+Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>.StateStore.set -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy
+Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy.FailClosed = 1 -> Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy
+Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy.FailOpen = 2 -> Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy
+Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy.PreferLastKnownState = 0 -> Polly.CircuitBreaker.Distributed.DistributedCircuitPartitionPolicy
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.Closed.get -> Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.DistributedCircuitSnapshot() -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.DistributedCircuitSnapshot(Polly.CircuitBreaker.CircuitState state, long version, System.DateTimeOffset openUntilUtc, System.DateTimeOffset updatedAtUtc, string? halfOpenLeaseOwner, System.DateTimeOffset? halfOpenLeaseExpiresUtc, string? lastError) -> void
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.HalfOpenLeaseExpiresUtc.get -> System.DateTimeOffset?
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.HalfOpenLeaseOwner.get -> string?
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.LastError.get -> string?
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.OpenUntilUtc.get -> System.DateTimeOffset
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.State.get -> Polly.CircuitBreaker.CircuitState
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.UpdatedAtUtc.get -> System.DateTimeOffset
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.Version.get -> long
+Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot.WithNextVersion(Polly.CircuitBreaker.CircuitState state, System.DateTimeOffset openUntilUtc, System.DateTimeOffset updatedAtUtc, string? halfOpenLeaseOwner, System.DateTimeOffset? halfOpenLeaseExpiresUtc, string? lastError) -> Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot
+Polly.CircuitBreaker.Distributed.DistributedHealthAggregate
+Polly.CircuitBreaker.Distributed.DistributedHealthAggregate.ContributingInstances.get -> int
+Polly.CircuitBreaker.Distributed.DistributedHealthAggregate.DistributedHealthAggregate() -> void
+Polly.CircuitBreaker.Distributed.DistributedHealthAggregate.DistributedHealthAggregate(int successCount, int failureCount, int contributingInstances, int maxConsecutiveFailures) -> void
+Polly.CircuitBreaker.Distributed.DistributedHealthAggregate.FailureCount.get -> int
+Polly.CircuitBreaker.Distributed.DistributedHealthAggregate.FailureRate.get -> double
+Polly.CircuitBreaker.Distributed.DistributedHealthAggregate.MaxConsecutiveFailures.get -> int
+Polly.CircuitBreaker.Distributed.DistributedHealthAggregate.SuccessCount.get -> int
+Polly.CircuitBreaker.Distributed.DistributedHealthAggregate.Throughput.get -> int
+Polly.CircuitBreaker.Distributed.DistributedHealthContribution
+Polly.CircuitBreaker.Distributed.DistributedHealthContribution.ConsecutiveFailureCount.get -> int
+Polly.CircuitBreaker.Distributed.DistributedHealthContribution.DistributedHealthContribution() -> void
+Polly.CircuitBreaker.Distributed.DistributedHealthContribution.DistributedHealthContribution(string! instanceId, int successCount, int failureCount, int consecutiveFailureCount, System.DateTimeOffset reportedAtUtc) -> void
+Polly.CircuitBreaker.Distributed.DistributedHealthContribution.FailureCount.get -> int
+Polly.CircuitBreaker.Distributed.DistributedHealthContribution.InstanceId.get -> string!
+Polly.CircuitBreaker.Distributed.DistributedHealthContribution.ReportedAtUtc.get -> System.DateTimeOffset
+Polly.CircuitBreaker.Distributed.DistributedHealthContribution.SuccessCount.get -> int
+Polly.CircuitBreaker.Distributed.DistributedHealthContribution.Throughput.get -> int
+Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore
+Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.ClearHealthAsync(string! circuitKey, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.GetAggregatedHealthAsync(string! circuitKey, System.DateTimeOffset utcNow, System.TimeSpan maxAge, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Polly.CircuitBreaker.Distributed.DistributedHealthAggregate>
+Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.GetAsync(string! circuitKey, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot?>
+Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.PublishHealthAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedHealthContribution contribution, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.TryUpdateAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot expected, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.Clear() -> void
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.ClearHealthAsync(string! circuitKey, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.GetAggregatedHealthAsync(string! circuitKey, System.DateTimeOffset utcNow, System.TimeSpan maxAge, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Polly.CircuitBreaker.Distributed.DistributedHealthAggregate>
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.GetAsync(string! circuitKey, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot?>
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.InMemoryDistributedCircuitStateStore() -> void
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.PublishHealthAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedHealthContribution contribution, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.TryUpdateAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot expected, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot next, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
+Polly.DistributedCircuitBreakerResiliencePipelineBuilderExtensions
+static Polly.DistributedCircuitBreakerResiliencePipelineBuilderExtensions.AddDistributedCircuitBreaker(this Polly.ResiliencePipelineBuilder! builder, Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions! options) -> Polly.ResiliencePipelineBuilder!
+static Polly.DistributedCircuitBreakerResiliencePipelineBuilderExtensions.AddDistributedCircuitBreaker<TResult>(this Polly.ResiliencePipelineBuilder<TResult>! builder, Polly.CircuitBreaker.Distributed.DistributedCircuitBreakerStrategyOptions<TResult>! options) -> Polly.ResiliencePipelineBuilder<TResult>!

@@ -60,6 +60,30 @@ public class CircuitBreakerStrategyOptions<TResult> : ResilienceStrategyOptions
     public TimeSpan SamplingDuration { get; set; } = CircuitBreakerConstants.DefaultSamplingDuration;
 
     /// <summary>
+    /// Gets or sets the duration threshold above which a successful call is counted as slow.
+    /// When <see langword="null"/> (default), slow-call tracking is disabled.
+    /// </summary>
+    /// <value>The default value is <see langword="null"/> (disabled).</value>
+    public TimeSpan? SlowCallDurationThreshold { get; set; }
+
+    /// <summary>
+    /// Gets or sets the slow-call rate at which the circuit will break (0–1 inclusive).
+    /// Requires <see cref="SlowCallDurationThreshold"/> to be set. When <see langword="null"/> (default),
+    /// slow-call rate does not trip the circuit.
+    /// </summary>
+    /// <value>The default value is <see langword="null"/> (disabled).</value>
+    [Range(0, 1.0)]
+    public double? SlowCallRateThreshold { get; set; }
+
+    /// <summary>
+    /// Gets or sets the number of consecutive handled failures after which the circuit will break.
+    /// When <see langword="null"/> (default), consecutive failures do not trip the circuit independently.
+    /// </summary>
+    /// <value>The default value is <see langword="null"/> (disabled). When set, must be 1 or greater.</value>
+    [Range(1, int.MaxValue)]
+    public int? ConsecutiveFailureThreshold { get; set; }
+
+    /// <summary>
     /// Gets or sets the duration of break the circuit will stay open before resetting.
     /// </summary>
     /// <value>
