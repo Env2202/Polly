@@ -7,15 +7,30 @@ internal sealed class AdvancedCircuitBehavior : CircuitBehavior
     private readonly HealthMetrics _metrics;
     private readonly double _failureRatio;
     private readonly int _minimumThroughput;
+    private readonly double? _slowCallRateThreshold;
+    private readonly int? _consecutiveFailureThreshold;
 
-    public AdvancedCircuitBehavior(double failureRatio, int minimumThroughput, HealthMetrics metrics)
+    public AdvancedCircuitBehavior(
+        double failureRatio,
+        int minimumThroughput,
+        HealthMetrics metrics,
+        double? slowCallRateThreshold = null,
+        int? consecutiveFailureThreshold = null)
     {
         _metrics = metrics;
         _failureRatio = failureRatio;
         _minimumThroughput = minimumThroughput;
+        _slowCallRateThreshold = slowCallRateThreshold;
+        _consecutiveFailureThreshold = consecutiveFailureThreshold;
     }
 
-    public override void OnActionSuccess(CircuitState currentState) => _metrics.IncrementSuccess();
+    public override void OnActionSuccess(CircuitState currentState, TimeSpan? duration = null)
+    {
+        _metrics.IncrementSuccess(duration);
+
+        // Slow-call rate can trip the circuit on a successful (but slow) outcome.
+        // Trip evaluation happens only while closed; half-open success always closes via controller.
+    }
 
     public override void OnActionFailure(CircuitState currentState, out bool shouldBreak)
     {
@@ -23,8 +38,7 @@ internal sealed class AdvancedCircuitBehavior : CircuitBehavior
         {
             case CircuitState.Closed:
                 _metrics.IncrementFailure();
-                var info = _metrics.GetHealthInfo();
-                shouldBreak = info.Throughput >= _minimumThroughput && info.FailureRate >= _failureRatio;
+                shouldBreak = ShouldTrip(_metrics.GetHealthInfo());
                 break;
 
             case CircuitState.Open:
@@ -41,6 +55,44 @@ internal sealed class AdvancedCircuitBehavior : CircuitBehavior
                 shouldBreak = false;
                 break;
         }
+    }
+
+    /// <summary>
+    /// Evaluates whether a successful outcome should open the circuit (slow-call dimension only).
+    /// Called from the controller after recording success while closed.
+    /// </summary>
+    internal bool ShouldBreakOnSuccess()
+    {
+        if (_slowCallRateThreshold is null)
+        {
+            return false;
+        }
+
+        return ShouldTripSlowCall(_metrics.GetHealthInfo());
+    }
+
+    private bool ShouldTrip(HealthInfo info) =>
+        ShouldTripFailureRate(info) || ShouldTripSlowCall(info) || ShouldTripConsecutive(info);
+
+    private bool ShouldTripFailureRate(HealthInfo info) =>
+        info.Throughput >= _minimumThroughput && info.FailureRate >= _failureRatio;
+
+    private bool ShouldTripSlowCall(HealthInfo info) =>
+        _slowCallRateThreshold is { } threshold
+        && info.Throughput >= _minimumThroughput
+        && info.SlowCallRate >= threshold;
+
+    private bool ShouldTripConsecutive(HealthInfo info)
+    {
+        if (_consecutiveFailureThreshold is not { } threshold
+            || info.ConsecutiveFailureCount < threshold)
+        {
+            return false;
+        }
+
+        // Require meaningful sample volume: at least min(threshold, MinimumThroughput)
+        // so a lone poisoned counter cannot trip without recent traffic.
+        return info.Throughput >= Math.Min(_minimumThroughput, threshold);
     }
 
     public override void OnCircuitClosed() => _metrics.Reset();

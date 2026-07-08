@@ -182,7 +182,7 @@ internal sealed class CircuitStateController<T> : IDisposable
         return null;
     }
 
-    public Task OnUnhandledOutcomeAsync(Outcome<T> outcome, ResilienceContext context)
+    public Task OnUnhandledOutcomeAsync(Outcome<T> outcome, ResilienceContext context, TimeSpan? duration = null)
     {
         EnsureNotDisposed();
 
@@ -190,17 +190,23 @@ internal sealed class CircuitStateController<T> : IDisposable
 
         lock (_lock)
         {
-            _behavior.OnActionSuccess(_circuitState);
+            _behavior.OnActionSuccess(_circuitState, duration);
 
             // Circuit state handling:
             //
             // HalfOpen - close the circuit
-            // Closed - do nothing
+            // Closed - optionally open if slow-call rate trips (multi-dimension CB)
             // Open, Isolated -  A successful call result may arrive when the circuit is open, if it was placed before the circuit broke.
             // We take no special action; only time passing governs transitioning from Open to HalfOpen state.
             if (_circuitState == CircuitState.HalfOpen)
             {
                 task = CloseCircuit_NeedsLock(outcome, manual: false, context);
+            }
+            else if (_circuitState == CircuitState.Closed
+                && _behavior is AdvancedCircuitBehavior advanced
+                && advanced.ShouldBreakOnSuccess())
+            {
+                task = OpenCircuitFor_NeedsLock(outcome, _breakDuration, manual: false, context);
             }
 
         }

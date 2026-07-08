@@ -18,11 +18,24 @@ internal abstract class HealthMetrics
 
     protected TimeProvider TimeProvider { get; }
 
-    public abstract void IncrementSuccess();
+    /// <summary>
+    /// Records a successful outcome. When <paramref name="duration"/> is provided and exceeds the
+    /// configured slow-call threshold (set via <see cref="ConfigureSlowCall"/>), it counts as a slow call.
+    /// Always resets the consecutive failure counter.
+    /// </summary>
+    public abstract void IncrementSuccess(TimeSpan? duration = null);
 
     public abstract void IncrementFailure();
 
     public abstract void Reset();
 
     public abstract HealthInfo GetHealthInfo();
+
+    /// <summary>
+    /// Configures optional slow-call detection. When <paramref name="slowCallDurationThreshold"/> is null,
+    /// slow-call tracking is disabled (existing failure-rate-only behavior).
+    /// </summary>
+    public virtual void ConfigureSlowCall(TimeSpan? slowCallDurationThreshold)
+    {
+    }
 }

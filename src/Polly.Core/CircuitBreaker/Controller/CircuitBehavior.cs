@@ -5,7 +5,9 @@ namespace Polly.CircuitBreaker;
 /// </summary>
 internal abstract class CircuitBehavior
 {
-    public abstract void OnActionSuccess(CircuitState currentState);
+    /// <param name="currentState">The circuit state at the time of the successful action.</param>
+    /// <param name="duration">Elapsed time of the successful call; used for slow-call rate when configured.</param>
+    public abstract void OnActionSuccess(CircuitState currentState, TimeSpan? duration = null);
 
     public abstract void OnActionFailure(CircuitState currentState, out bool shouldBreak);
 
