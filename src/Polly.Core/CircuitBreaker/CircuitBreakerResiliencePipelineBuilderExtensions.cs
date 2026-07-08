@@ -34,6 +34,7 @@ public static class CircuitBreakerResiliencePipelineBuilderExtensions
     {
         Guard.NotNull(builder);
         Guard.NotNull(options);
+        ValidateMultiDimensionOptions(options);
 
         return builder.AddStrategy(context => CreateStrategy(context, options), options);
     }
@@ -64,6 +65,7 @@ public static class CircuitBreakerResiliencePipelineBuilderExtensions
     {
         Guard.NotNull(builder);
         Guard.NotNull(options);
+        ValidateMultiDimensionOptions(options);
 
         return builder.AddStrategy(context => CreateStrategy(context, options), options);
     }
@@ -72,6 +74,9 @@ public static class CircuitBreakerResiliencePipelineBuilderExtensions
         StrategyBuilderContext context,
         CircuitBreakerStrategyOptions<TResult> options)
     {
+        // Callers that use CreateStrategy directly (tests) should already validate; keep a guard.
+        ValidateMultiDimensionOptions(options);
+
         var metrics = HealthMetrics.Create(options.SamplingDuration, context.TimeProvider);
         metrics.ConfigureSlowCall(options.SlowCallDurationThreshold);
 
@@ -98,6 +103,21 @@ public static class CircuitBreakerResiliencePipelineBuilderExtensions
             options.StateProvider,
             options.ManualControl,
             context.TimeProvider);
+    }
+
+    private static void ValidateMultiDimensionOptions<TResult>(CircuitBreakerStrategyOptions<TResult> options)
+    {
+        if (options.SlowCallDurationThreshold is { } duration && duration <= TimeSpan.Zero)
+        {
+            throw new ValidationException(
+                $"{nameof(options.SlowCallDurationThreshold)} must be greater than zero when set.");
+        }
+
+        if (options.SlowCallRateThreshold is not null && options.SlowCallDurationThreshold is null)
+        {
+            throw new ValidationException(
+                $"{nameof(options.SlowCallRateThreshold)} requires {nameof(options.SlowCallDurationThreshold)} to be set.");
+        }
     }
 }
 

@@ -142,6 +142,12 @@ internal sealed class SelfTuningTimeoutResilienceStrategy : ResilienceStrategy
             return Outcome.FromException<TResult>(timeoutException.TrySetStackTrace());
         }
 
+        // Caller cancellation must not pollute adaptive latency/failure metrics.
+        if (outcome.Exception is OperationCanceledException && previousToken.IsCancellationRequested)
+        {
+            return outcome.WithCallerCancellationToken(previousToken);
+        }
+
         // Successful completion or non-timeout failure — record duration; success only when no exception.
         _metrics.Record(duration, success: outcome.Exception is null);
         return outcome.WithCallerCancellationToken(previousToken);

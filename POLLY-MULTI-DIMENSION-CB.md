@@ -12,7 +12,7 @@ Extend advanced circuit breaker beyond **rolling failure rate** so any of three 
 |-----------|-------------------------------|
 | **Failure rate** (existing) | `Throughput >= MinimumThroughput` AND `FailureRate >= FailureRatio` |
 | **Slow call rate** (new) | `Throughput >= MinimumThroughput` AND `SlowCallRate >= SlowCallRateThreshold` |
-| **Consecutive failures** (new) | `ConsecutiveFailureCount >= ConsecutiveFailureThreshold` |
+| **Consecutive failures** (new) | `ConsecutiveFailureCount >= ConsecutiveFailureThreshold` **and** `Throughput >= min(MinimumThroughput, threshold)` |
 
 Unify in existing `AdvancedCircuitBehavior` + `HealthMetrics` / `HealthInfo` — **no** separate `CircuitBehavior` subclass for consecutive.
 

@@ -6,6 +6,13 @@ namespace Polly.CircuitBreaker.Distributed;
 /// <remarks>
 /// Implementations typically wrap Redis, etcd, a database row, or a consensus system.
 /// All operations should be safe under concurrent writers using <see cref="TryUpdateAsync"/>'s compare-and-swap semantics.
+/// <para>
+/// <b>Trust model:</b> every writer is a co-equal service instance. The store is a privileged control plane:
+/// any process that can read/write it can open or close circuits, spoof health contributions, and steal
+/// half-open leases. Protect the backend with mutual authentication, network isolation, and least privilege.
+/// Never expose the store to untrusted clients. Use unique, non-guessable <c>InstanceId</c> values and
+/// namespace <c>circuitKey</c> values per environment/tenant.
+/// </para>
 /// </remarks>
 public interface IDistributedCircuitStateStore
 {

@@ -106,6 +106,7 @@ internal sealed class SelfTuningRetryResilienceStrategy<T> : ResilienceStrategy<
         var (maxAttempts, baseDelay) = GetCurrentParameters();
         double retryState = 0;
         var attempt = 0;
+        var operationStart = _timeProvider.GetTimestamp();
 
         while (true)
         {
@@ -126,9 +127,6 @@ internal sealed class SelfTuningRetryResilienceStrategy<T> : ResilienceStrategy<
             var shouldRetry = await _shouldHandle(new RetryPredicateArguments<T>(context, outcome, attempt))
                 .ConfigureAwait(context.ContinueOnCapturedContext);
 
-            // Handled outcomes count as failures for adaptive tuning; unhandled as success.
-            _metrics.Record(duration, success: !shouldRetry);
-
             var isLastAttempt = attempt >= maxAttempts;
             if (isLastAttempt)
             {
@@ -141,6 +139,15 @@ internal sealed class SelfTuningRetryResilienceStrategy<T> : ResilienceStrategy<
 
             if (!shouldRetry || isLastAttempt)
             {
+                // One sample per logical operation (not per attempt) so retries do not inflate failure rate.
+                // Caller cancellation is excluded from adaptive metrics.
+                if (outcome.Exception is not OperationCanceledException
+                    || !context.CancellationToken.IsCancellationRequested)
+                {
+                    var totalDuration = _timeProvider.GetElapsedTime(operationStart);
+                    _metrics.Record(totalDuration, success: !shouldRetry);
+                }
+
                 return outcome;
             }
 
@@ -179,6 +186,7 @@ internal sealed class SelfTuningRetryResilienceStrategy<T> : ResilienceStrategy<
             }
             catch (OperationCanceledException e)
             {
+                // Do not record caller cancellation into adaptive metrics.
                 return Outcome.FromException<T>(e);
             }
 

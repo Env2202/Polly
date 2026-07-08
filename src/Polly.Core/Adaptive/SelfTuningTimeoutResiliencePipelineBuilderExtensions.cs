@@ -34,6 +34,18 @@ public static class SelfTuningTimeoutResiliencePipelineBuilderExtensions
             throw new ValidationException($"{nameof(options.MinTimeout)} must be less than or equal to {nameof(options.MaxTimeout)}.");
         }
 
+        if (options.MinimumSamples > options.Capacity)
+        {
+            throw new ValidationException(
+                $"{nameof(options.MinimumSamples)} must be less than or equal to {nameof(options.Capacity)}.");
+        }
+
+        if (options.InitialTimeout < options.MinTimeout || options.InitialTimeout > options.MaxTimeout)
+        {
+            throw new ValidationException(
+                $"{nameof(options.InitialTimeout)} must be between {nameof(options.MinTimeout)} and {nameof(options.MaxTimeout)} (inclusive).");
+        }
+
         builder.AddStrategy(
             context => new SelfTuningTimeoutResilienceStrategy(options, context.TimeProvider, context.Telemetry),
             options);

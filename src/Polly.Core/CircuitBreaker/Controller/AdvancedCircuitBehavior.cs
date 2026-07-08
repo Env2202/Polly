@@ -82,9 +82,18 @@ internal sealed class AdvancedCircuitBehavior : CircuitBehavior
         && info.Throughput >= _minimumThroughput
         && info.SlowCallRate >= threshold;
 
-    private bool ShouldTripConsecutive(HealthInfo info) =>
-        _consecutiveFailureThreshold is { } threshold
-        && info.ConsecutiveFailureCount >= threshold;
+    private bool ShouldTripConsecutive(HealthInfo info)
+    {
+        if (_consecutiveFailureThreshold is not { } threshold
+            || info.ConsecutiveFailureCount < threshold)
+        {
+            return false;
+        }
+
+        // Require meaningful sample volume: at least min(threshold, MinimumThroughput)
+        // so a lone poisoned counter cannot trip without recent traffic.
+        return info.Throughput >= Math.Min(_minimumThroughput, threshold);
+    }
 
     public override void OnCircuitClosed() => _metrics.Reset();
     public override int FailureCount => _metrics.GetHealthInfo().FailureCount;

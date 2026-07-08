@@ -146,6 +146,62 @@ public class SelfTuningTimeoutResilienceStrategyTests
     }
 
     [Fact]
+    public void AddSelfTuningTimeout_MinimumSamplesAboveCapacity_Throws()
+    {
+        Should.Throw<System.ComponentModel.DataAnnotations.ValidationException>(() =>
+            new ResiliencePipelineBuilder().AddSelfTuningTimeout(new SelfTuningTimeoutStrategyOptions
+            {
+                Capacity = 5,
+                MinimumSamples = 10,
+            }));
+    }
+
+    [Fact]
+    public void AddSelfTuningTimeout_InitialOutsideMinMax_Throws()
+    {
+        Should.Throw<System.ComponentModel.DataAnnotations.ValidationException>(() =>
+            new ResiliencePipelineBuilder().AddSelfTuningTimeout(new SelfTuningTimeoutStrategyOptions
+            {
+                MinTimeout = TimeSpan.FromSeconds(1),
+                MaxTimeout = TimeSpan.FromSeconds(5),
+                InitialTimeout = TimeSpan.FromSeconds(10),
+            }));
+
+        Should.Throw<System.ComponentModel.DataAnnotations.ValidationException>(() =>
+            new ResiliencePipelineBuilder().AddSelfTuningTimeout(new SelfTuningTimeoutStrategyOptions
+            {
+                MinTimeout = TimeSpan.FromSeconds(1),
+                MaxTimeout = TimeSpan.FromSeconds(5),
+                InitialTimeout = TimeSpan.FromMilliseconds(50),
+            }));
+    }
+
+    [Fact]
+    public async Task Execute_CallerCancellation_DoesNotRecordMetrics()
+    {
+        var options = CreateOptions();
+        options.InitialTimeout = TimeSpan.FromSeconds(30);
+        options.MinTimeout = TimeSpan.FromMilliseconds(50);
+        options.MaxTimeout = TimeSpan.FromSeconds(60);
+        options.MinimumSamples = 100;
+
+        var strategy = CreateStrategy(options);
+        var pipeline = strategy.AsPipeline();
+        using var cts = new CancellationTokenSource();
+
+        var execute = pipeline.ExecuteAsync(async token =>
+        {
+            // Cooperative cancel after the timeout strategy has linked tokens.
+            cts.Cancel();
+            token.ThrowIfCancellationRequested();
+            await Task.CompletedTask;
+        }, cts.Token);
+
+        await Should.ThrowAsync<OperationCanceledException>(async () => await execute);
+        strategy.Metrics.GetSnapshot().SampleCount.ShouldBe(0);
+    }
+
+    [Fact]
     public void AddSelfTuningTimeout_BuildsPipeline()
     {
         var pipeline = new ResiliencePipelineBuilder()

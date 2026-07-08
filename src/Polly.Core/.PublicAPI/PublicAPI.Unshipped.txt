@@ -182,9 +182,12 @@ Polly.CircuitBreaker.Distributed.IDistributedCircuitStateStore.TryUpdateAsync(st
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.Clear() -> void
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.ClearHealthAsync(string! circuitKey, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
+const Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.DefaultMaxTrackedCircuitKeys = 10000 -> int
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.GetAggregatedHealthAsync(string! circuitKey, System.DateTimeOffset utcNow, System.TimeSpan maxAge, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Polly.CircuitBreaker.Distributed.DistributedHealthAggregate>
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.GetAsync(string! circuitKey, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot?>
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.InMemoryDistributedCircuitStateStore() -> void
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.InMemoryDistributedCircuitStateStore(int maxTrackedCircuitKeys) -> void
+Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.MaxTrackedCircuitKeys.get -> int
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.PublishHealthAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedHealthContribution contribution, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask
 Polly.CircuitBreaker.Distributed.InMemoryDistributedCircuitStateStore.TryUpdateAsync(string! circuitKey, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot expected, Polly.CircuitBreaker.Distributed.DistributedCircuitSnapshot updated, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<bool>
 Polly.DistributedCircuitBreakerResiliencePipelineBuilderExtensions

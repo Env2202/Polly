@@ -20,6 +20,7 @@ public enum DistributedCircuitPartitionPolicy
     /// <summary>
     /// Treat store failure as a closed circuit (fail open) and allow traffic.
     /// Use when availability of the caller is more important than protecting the dependency.
+    /// Prefer <see cref="FailClosed"/> when the store may be targeted or the dependency is critical.
     /// </summary>
     FailOpen = 2,
 }

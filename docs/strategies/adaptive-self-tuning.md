@@ -109,19 +109,22 @@ On each execution:
 1. Compute adaptive timeout.
 2. Link a timeout CTS (same approach as built-in timeout strategy).
 3. On **timeout**: record failure, raise `OnTimeout`, return `TimeoutRejectedException`.
-4. On **completion**: record duration and success/failure.
+4. On **caller cancellation**: return without recording (does not pollute metrics).
+5. On **completion**: record duration and success/failure.
+
+Validation: `MinTimeout ≤ InitialTimeout ≤ MaxTimeout`, `MinimumSamples ≤ Capacity`.
 
 ### Options (`SelfTuningTimeoutStrategyOptions`)
 
 | Property | Default | Meaning |
 |----------|---------|---------|
-| `InitialTimeout` | 30s | Used until `MinimumSamples` observed |
+| `InitialTimeout` | 30s | Used until `MinimumSamples` observed (must be within min/max) |
 | `MinTimeout` / `MaxTimeout` | 50ms / 60s | Hard clamps |
 | `LatencyPercentile` | 0.99 | Percentile of recent durations |
 | `TimeoutMultiplier` | 2.0 | Headroom over observed latency |
 | `SamplingWindow` | 30s | How long samples remain relevant |
 | `Capacity` | 256 | Max samples retained |
-| `MinimumSamples` | 20 | Warm-up before adapting |
+| `MinimumSamples` | 20 | Warm-up before adapting (≤ Capacity) |
 | `Metrics` | `null` | Optional shared metrics |
 | `OnTimeout` | `null` | Callback when timeout fires |
 
@@ -178,20 +181,22 @@ After warm-up (`MinimumSamples`):
 
 Per attempt, delays use existing `RetryHelper` with `BackoffType` and optional jitter (same formulas as classic retry).
 
-Each attempt records `(duration, success: !shouldHandle)` so the window reflects real pressure under retries.
+**Metrics:** one sample per **logical operation** (not per attempt), with total duration and `success: !shouldHandle` on the final outcome. Retries therefore do not inflate failure rate. Caller cancellation is not recorded.
+
+Validation: `Min ≤ Initial ≤ Max` for attempts and delays; `MinimumSamples ≤ Capacity`.
 
 ### Options (`SelfTuningRetryStrategyOptions` / `<TResult>`)
 
 | Property | Default | Meaning |
 |----------|---------|---------|
-| `InitialRetryAttempts` | 3 | Warm-up attempts |
+| `InitialRetryAttempts` | 3 | Warm-up attempts (within min/max) |
 | `MinRetryAttempts` / `MaxRetryAttempts` | 1 / 5 | Adaptive range |
-| `InitialDelay` | 1s | Warm-up base delay |
+| `InitialDelay` | 1s | Warm-up base delay (within min/max) |
 | `MinDelay` / `MaxDelay` | 100ms / 30s | Adaptive delay bounds |
 | `BackoffType` | Exponential | Per-attempt schedule |
 | `UseJitter` | `true` | Decorrelated jitter |
 | `HighFailureRateThreshold` | 0.5 | Load-shedding pivot |
-| `SamplingWindow` / `Capacity` / `MinimumSamples` | 30s / 256 / 20 | Metrics window |
+| `SamplingWindow` / `Capacity` / `MinimumSamples` | 30s / 256 / 20 | Metrics window (`MinimumSamples` ≤ Capacity) |
 | `ShouldHandle` | any exception except cancel | What counts as retryable |
 | `Metrics` | `null` | Optional shared metrics |
 | `OnRetry` | `null` | Callback before delay |
@@ -313,7 +318,7 @@ dotnet test test/Polly.Core.Tests/Polly.Core.Tests.csproj \
 2. **Warm-up samples** — avoid adapting on noise at process start.
 3. **High failure rate reduces retries** — prefers stability over hammering a broken dependency (opposite of “always retry more”).
 4. **Not a replacement for circuit breaker** — pair with `AddCircuitBreaker` when you need hard open/half-open isolation.
-5. **Metrics are attempt-scoped for retry** — every attempt updates the window so sustained failure is visible quickly.
+5. **Metrics are operation-scoped for retry** — one sample per logical call so retries do not inflate failure rate; sustained failure still shows as repeated failed operations.
 
 ---
 

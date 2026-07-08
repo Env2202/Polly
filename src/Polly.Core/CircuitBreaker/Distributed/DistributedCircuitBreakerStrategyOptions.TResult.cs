@@ -73,6 +73,10 @@ public class DistributedCircuitBreakerStrategyOptions<TResult> : ResilienceStrat
     /// Gets or sets optional consecutive-failure trip threshold using the max consecutive streak across instances.
     /// When <see langword="null"/>, consecutive failures do not independently open the circuit.
     /// </summary>
+    /// <remarks>
+    /// Consecutive trips also require aggregate throughput of at least
+    /// <c>min(<see cref="MinimumThroughput"/>, threshold)</c> so a counter without recent traffic cannot trip the cluster.
+    /// </remarks>
     [Range(1, int.MaxValue)]
     public int? ConsecutiveFailureThreshold { get; set; }
 
@@ -80,10 +84,8 @@ public class DistributedCircuitBreakerStrategyOptions<TResult> : ResilienceStrat
     /// Gets or sets allowed clock skew when interpreting <see cref="DistributedCircuitSnapshot.OpenUntilUtc"/>.
     /// </summary>
     /// <remarks>
-    /// The circuit is treated as still open while <c>now &lt; OpenUntilUtc + AllowedClockSkew</c>,
-    /// and eligible for half-open when <c>now &gt;= OpenUntilUtc - AllowedClockSkew</c> only after the stricter
-    /// open check fails. Practically, break windows are slightly extended by the skew budget to avoid
-    /// early probes on lagging clocks.
+    /// The circuit is treated as still open while <c>now &lt; OpenUntilUtc + AllowedClockSkew</c>.
+    /// Break windows are only extended (never shortened) so lagging clocks do not probe early.
     /// </remarks>
     /// <value>Default is 2 seconds.</value>
     [Range(typeof(TimeSpan), "00:00:00", "00:05:00")]
@@ -97,8 +99,14 @@ public class DistributedCircuitBreakerStrategyOptions<TResult> : ResilienceStrat
     public TimeSpan HalfOpenLeaseDuration { get; set; } = DistributedCircuitBreakerConstants.DefaultHalfOpenLeaseDuration;
 
     /// <summary>
-    /// Gets or sets the minimum interval between remote state refreshes on the hot path.
+    /// Gets or sets the minimum interval between remote state refreshes on the hot path when the last known
+    /// state is not <see cref="CircuitState.Closed"/>.
     /// </summary>
+    /// <remarks>
+    /// When the last known state is <see cref="CircuitState.Closed"/>, each execution force-refreshes from the
+    /// store so another instance's open is observed promptly (avoids a fail-open window of this interval).
+    /// Set to <see cref="TimeSpan.Zero"/> for strongest consistency on all paths (higher store load).
+    /// </remarks>
     /// <value>Default is 100 milliseconds.</value>
     [Range(typeof(TimeSpan), "00:00:00", "00:00:10")]
     public TimeSpan StateRefreshInterval { get; set; } = DistributedCircuitBreakerConstants.DefaultStateRefreshInterval;

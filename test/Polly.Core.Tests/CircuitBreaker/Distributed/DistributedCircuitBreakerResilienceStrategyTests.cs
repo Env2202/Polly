@@ -485,13 +485,143 @@ public class DistributedCircuitBreakerResilienceStrategyTests
         var snap = (await _store.GetAsync("dep", CancellationToken.None))!.Value;
         snap.State.ShouldBe(CircuitState.Open);
         snap.HalfOpenLeaseOwner.ShouldBeNull();
+        // Soft reopen: do not restart a full break window.
+        snap.OpenUntilUtc.ShouldBeLessThanOrEqualTo(_time.GetUtcNow());
+    }
+
+    [Fact]
+    public async Task OpenPath_LeaseAcquiredWhileProbeInFlight_RejectsSecondCaller()
+    {
+        // Store reports half-open CAS success without serializing ownership so a second Open-path
+        // caller can observe TryAcquire=true while the first call still holds the local probe slot.
+        var open = DistributedCircuitSnapshot.Closed.WithNextVersion(
+            CircuitState.Open,
+            _time.GetUtcNow().AddMilliseconds(1),
+            _time.GetUtcNow(),
+            null,
+            null,
+            "seed");
+        (await _store.TryUpdateAsync("dep", DistributedCircuitSnapshot.Closed, open, CancellationToken.None)).ShouldBeTrue();
+        _time.Advance(TimeSpan.FromMilliseconds(5));
+
+        var options = BaseOptions("race-slot");
+        options.AllowedClockSkew = TimeSpan.Zero;
+        options.StateRefreshInterval = TimeSpan.Zero;
+        options.HalfOpenLeaseDuration = TimeSpan.FromSeconds(30);
+        options.MinimumThroughput = 1000;
+        options.StateStore = new HalfOpenCasAlwaysSucceedsStore(_store, _time);
+        var pipeline = Build(options);
+
+        var probeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseProbe = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var probeTask = pipeline.ExecuteAsync(async _ =>
+        {
+            probeStarted.SetResult();
+            await releaseProbe.Task;
+            return 1;
+        });
+
+        await probeStarted.Task;
+
+        await Should.ThrowAsync<BrokenCircuitException>(async () =>
+            await pipeline.ExecuteAsync(_ => new ValueTask<int>(2)));
+
+        releaseProbe.SetResult();
+        (await probeTask).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task OpenPath_TryUpdateThrows_ThenOwnedHalfOpenAllowsProbe()
+    {
+        var open = DistributedCircuitSnapshot.Closed.WithNextVersion(
+            CircuitState.Open,
+            _time.GetUtcNow().AddMilliseconds(1),
+            _time.GetUtcNow(),
+            null,
+            null,
+            "seed");
+        (await _store.TryUpdateAsync("dep", DistributedCircuitSnapshot.Closed, open, CancellationToken.None)).ShouldBeTrue();
+        _time.Advance(TimeSpan.FromMilliseconds(5));
+
+        var options = BaseOptions("throw-then-own");
+        options.AllowedClockSkew = TimeSpan.Zero;
+        options.StateRefreshInterval = TimeSpan.Zero;
+        options.MinimumThroughput = 1000;
+        options.StateStore = new TryUpdateThrowsThenOwnedHalfOpenStore(_store, "throw-then-own", _time);
+
+        var pipeline = Build(options);
+        (await pipeline.ExecuteAsync(_ => new ValueTask<int>(9))).ShouldBe(9);
+    }
+
+    [Fact]
+    public async Task OpenPath_RefreshShowsOwnedExpiredLease_Rejects()
+    {
+        var open = DistributedCircuitSnapshot.Closed.WithNextVersion(
+            CircuitState.Open,
+            _time.GetUtcNow().AddMilliseconds(1),
+            _time.GetUtcNow(),
+            null,
+            null,
+            "seed");
+        (await _store.TryUpdateAsync("dep", DistributedCircuitSnapshot.Closed, open, CancellationToken.None)).ShouldBeTrue();
+        _time.Advance(TimeSpan.FromMilliseconds(5));
+
+        var options = BaseOptions("expired-owner");
+        options.AllowedClockSkew = TimeSpan.Zero;
+        options.StateRefreshInterval = TimeSpan.Zero;
+        options.MinimumThroughput = 1000;
+        options.StateStore = new TryUpdateThrowsThenExpiredOwnedHalfOpenStore(_store, "expired-owner", _time);
+
+        var pipeline = Build(options);
+        await Should.ThrowAsync<BrokenCircuitException>(async () =>
+            await pipeline.ExecuteAsync(_ => new ValueTask<int>(1)));
+    }
+
+    [Fact]
+    public async Task HalfOpen_SameInstance_SingleFlightProbe_RejectsConcurrent()
+    {
+        var now = _time.GetUtcNow();
+        var halfOpen = DistributedCircuitSnapshot.Closed.WithNextVersion(
+            CircuitState.HalfOpen,
+            now.AddSeconds(30),
+            now,
+            "single-flight",
+            now.AddSeconds(30),
+            "seed");
+        (await _store.TryUpdateAsync("dep", DistributedCircuitSnapshot.Closed, halfOpen, CancellationToken.None)).ShouldBeTrue();
+
+        var options = BaseOptions("single-flight");
+        options.MinimumThroughput = 1000;
+        options.StateRefreshInterval = TimeSpan.Zero;
+        options.HalfOpenLeaseDuration = TimeSpan.FromSeconds(30);
+        var pipeline = Build(options);
+
+        var probeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseProbe = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var probeTask = pipeline.ExecuteAsync(async _ =>
+        {
+            probeStarted.SetResult();
+            await releaseProbe.Task;
+            return 1;
+        });
+
+        await probeStarted.Task;
+
+        await Should.ThrowAsync<BrokenCircuitException>(async () =>
+            await pipeline.ExecuteAsync(_ => new ValueTask<int>(2)));
+
+        releaseProbe.SetResult();
+        (await probeTask).ShouldBe(1);
+        (await _store.GetAsync("dep", CancellationToken.None))!.Value.State.ShouldBe(CircuitState.Closed);
     }
 
     [Fact]
     public async Task ConsecutiveFailureThreshold_TripsIndependently()
     {
         var options = BaseOptions("consec");
-        options.MinimumThroughput = 1000; // prevent ratio-based trip
+        options.MinimumThroughput = 1000; // prevent ratio-based trip (throughput gate uses min(1000, 3)=3)
         options.FailureRatio = 1;
         options.ConsecutiveFailureThreshold = 3;
         options.StateRefreshInterval = TimeSpan.Zero;
@@ -795,16 +925,16 @@ public class DistributedCircuitBreakerResilienceStrategyTests
     }
 
     [Fact]
-    public async Task RefreshInterval_UsesCachedState()
+    public async Task RefreshInterval_WhenClosed_ForceRefreshesAndSeesRemoteOpen()
     {
-        var options = BaseOptions("cache");
+        var options = BaseOptions("cache-closed");
         options.StateRefreshInterval = TimeSpan.FromSeconds(10);
         options.MinimumThroughput = 1000;
 
         var pipeline = Build(options);
         await pipeline.ExecuteAsync(_ => new ValueTask<int>(1));
 
-        // Mutate store out-of-band; cached refresh should not see it immediately.
+        // Mutate store out-of-band while last known is Closed.
         var current = await _store.GetAsync("dep", CancellationToken.None) ?? DistributedCircuitSnapshot.Closed;
         var open = current.WithNextVersion(
             CircuitState.Open,
@@ -815,8 +945,46 @@ public class DistributedCircuitBreakerResilienceStrategyTests
             "external");
         (await _store.TryUpdateAsync("dep", current, open, CancellationToken.None)).ShouldBeTrue();
 
-        // Still within refresh interval → uses last known closed and allows traffic.
-        (await pipeline.ExecuteAsync(_ => new ValueTask<int>(2))).ShouldBe(2);
+        // Closed path force-refreshes → observes remote open and rejects (no fail-open window).
+        await Should.ThrowAsync<BrokenCircuitException>(async () =>
+            await pipeline.ExecuteAsync(_ => new ValueTask<int>(2)));
+    }
+
+    [Fact]
+    public async Task RefreshInterval_WhenOpen_UsesCachedState()
+    {
+        var options = BaseOptions("cache-open");
+        options.StateRefreshInterval = TimeSpan.FromSeconds(10);
+        options.MinimumThroughput = 1000;
+        options.BreakDuration = TimeSpan.FromMinutes(5);
+        options.AllowedClockSkew = TimeSpan.Zero;
+
+        var open = DistributedCircuitSnapshot.Closed.WithNextVersion(
+            CircuitState.Open,
+            _time.GetUtcNow().AddMinutes(5),
+            _time.GetUtcNow(),
+            null,
+            null,
+            "seed");
+        (await _store.TryUpdateAsync("dep", DistributedCircuitSnapshot.Closed, open, CancellationToken.None)).ShouldBeTrue();
+
+        var pipeline = Build(options);
+        await Should.ThrowAsync<BrokenCircuitException>(async () =>
+            await pipeline.ExecuteAsync(_ => new ValueTask<int>(1)));
+
+        // Close remotely while local cache still thinks Open within refresh interval.
+        var closed = open.WithNextVersion(
+            CircuitState.Closed,
+            DateTimeOffset.MinValue,
+            _time.GetUtcNow(),
+            null,
+            null,
+            null);
+        (await _store.TryUpdateAsync("dep", open, closed, CancellationToken.None)).ShouldBeTrue();
+
+        // Still within refresh interval while last known is Open → reject without re-fetch.
+        await Should.ThrowAsync<BrokenCircuitException>(async () =>
+            await pipeline.ExecuteAsync(_ => new ValueTask<int>(2)));
     }
 
     [Fact]
@@ -1823,6 +1991,179 @@ public class DistributedCircuitBreakerResilienceStrategyTests
 
             return new DistributedHealthAggregate(0, 10, 1, 10);
         }
+
+        public ValueTask ClearHealthAsync(string circuitKey, CancellationToken cancellationToken) =>
+            _inner.ClearHealthAsync(circuitKey, cancellationToken);
+    }
+
+    /// <summary>
+    /// Keeps reporting Open on Get and always accepts half-open CAS so concurrent Open-path
+    /// callers hit local single-flight rejection after the first probe slot is taken.
+    /// </summary>
+    private sealed class HalfOpenCasAlwaysSucceedsStore : IDistributedCircuitStateStore
+    {
+        private readonly InMemoryDistributedCircuitStateStore _inner;
+        private readonly TimeProvider _time;
+
+        public HalfOpenCasAlwaysSucceedsStore(InMemoryDistributedCircuitStateStore inner, TimeProvider time)
+        {
+            _inner = inner;
+            _time = time;
+        }
+
+        public async ValueTask<DistributedCircuitSnapshot?> GetAsync(string circuitKey, CancellationToken cancellationToken)
+        {
+            var current = await _inner.GetAsync(circuitKey, cancellationToken);
+            if (current is null)
+            {
+                return null;
+            }
+
+            // Force Open path even after a half-open write so the second caller also enters TryAcquire.
+            if (current.Value.State is CircuitState.Open or CircuitState.HalfOpen)
+            {
+                return new DistributedCircuitSnapshot(
+                    CircuitState.Open,
+                    current.Value.Version,
+                    _time.GetUtcNow().AddMilliseconds(-1),
+                    current.Value.UpdatedAtUtc,
+                    null,
+                    null,
+                    current.Value.LastError);
+            }
+
+            return current;
+        }
+
+        public ValueTask<bool> TryUpdateAsync(string circuitKey, DistributedCircuitSnapshot expected, DistributedCircuitSnapshot updated, CancellationToken cancellationToken)
+        {
+            if (updated.State == CircuitState.HalfOpen)
+            {
+                return new ValueTask<bool>(true);
+            }
+
+            return _inner.TryUpdateAsync(circuitKey, expected, updated, cancellationToken);
+        }
+
+        public ValueTask PublishHealthAsync(string circuitKey, DistributedHealthContribution contribution, CancellationToken cancellationToken) =>
+            _inner.PublishHealthAsync(circuitKey, contribution, cancellationToken);
+
+        public ValueTask<DistributedHealthAggregate> GetAggregatedHealthAsync(string circuitKey, DateTimeOffset utcNow, TimeSpan maxAge, CancellationToken cancellationToken) =>
+            _inner.GetAggregatedHealthAsync(circuitKey, utcNow, maxAge, cancellationToken);
+
+        public ValueTask ClearHealthAsync(string circuitKey, CancellationToken cancellationToken) =>
+            _inner.ClearHealthAsync(circuitKey, cancellationToken);
+    }
+
+    /// <summary>
+    /// TryUpdate for half-open always throws; Get then surfaces a valid owned half-open lease.
+    /// </summary>
+    private sealed class TryUpdateThrowsThenOwnedHalfOpenStore : IDistributedCircuitStateStore
+    {
+        private readonly InMemoryDistributedCircuitStateStore _inner;
+        private readonly string _instanceId;
+        private readonly TimeProvider _time;
+        private int _gets;
+
+        public TryUpdateThrowsThenOwnedHalfOpenStore(InMemoryDistributedCircuitStateStore inner, string instanceId, TimeProvider time)
+        {
+            _inner = inner;
+            _instanceId = instanceId;
+            _time = time;
+        }
+
+        public async ValueTask<DistributedCircuitSnapshot?> GetAsync(string circuitKey, CancellationToken cancellationToken)
+        {
+            var n = Interlocked.Increment(ref _gets);
+            var current = await _inner.GetAsync(circuitKey, cancellationToken);
+            if (n >= 2 && current is { State: CircuitState.Open } open)
+            {
+                var halfOpen = open.WithNextVersion(
+                    CircuitState.HalfOpen,
+                    open.OpenUntilUtc,
+                    _time.GetUtcNow(),
+                    _instanceId,
+                    _time.GetUtcNow().AddSeconds(30),
+                    open.LastError);
+                await _inner.TryUpdateAsync(circuitKey, open, halfOpen, cancellationToken);
+                return halfOpen;
+            }
+
+            return current;
+        }
+
+        public ValueTask<bool> TryUpdateAsync(string circuitKey, DistributedCircuitSnapshot expected, DistributedCircuitSnapshot updated, CancellationToken cancellationToken)
+        {
+            if (updated.State == CircuitState.HalfOpen)
+            {
+                throw new InvalidOperationException("cas unavailable");
+            }
+
+            return _inner.TryUpdateAsync(circuitKey, expected, updated, cancellationToken);
+        }
+
+        public ValueTask PublishHealthAsync(string circuitKey, DistributedHealthContribution contribution, CancellationToken cancellationToken) =>
+            _inner.PublishHealthAsync(circuitKey, contribution, cancellationToken);
+
+        public ValueTask<DistributedHealthAggregate> GetAggregatedHealthAsync(string circuitKey, DateTimeOffset utcNow, TimeSpan maxAge, CancellationToken cancellationToken) =>
+            _inner.GetAggregatedHealthAsync(circuitKey, utcNow, maxAge, cancellationToken);
+
+        public ValueTask ClearHealthAsync(string circuitKey, CancellationToken cancellationToken) =>
+            _inner.ClearHealthAsync(circuitKey, cancellationToken);
+    }
+
+    /// <summary>
+    /// TryUpdate for half-open throws; Get then surfaces an owned but expired half-open lease.
+    /// </summary>
+    private sealed class TryUpdateThrowsThenExpiredOwnedHalfOpenStore : IDistributedCircuitStateStore
+    {
+        private readonly InMemoryDistributedCircuitStateStore _inner;
+        private readonly string _instanceId;
+        private readonly TimeProvider _time;
+        private int _gets;
+
+        public TryUpdateThrowsThenExpiredOwnedHalfOpenStore(InMemoryDistributedCircuitStateStore inner, string instanceId, TimeProvider time)
+        {
+            _inner = inner;
+            _instanceId = instanceId;
+            _time = time;
+        }
+
+        public async ValueTask<DistributedCircuitSnapshot?> GetAsync(string circuitKey, CancellationToken cancellationToken)
+        {
+            var n = Interlocked.Increment(ref _gets);
+            var current = await _inner.GetAsync(circuitKey, cancellationToken);
+            if (n >= 2 && current is { State: CircuitState.Open } open)
+            {
+                var halfOpen = open.WithNextVersion(
+                    CircuitState.HalfOpen,
+                    open.OpenUntilUtc,
+                    _time.GetUtcNow(),
+                    _instanceId,
+                    _time.GetUtcNow().AddMilliseconds(-1), // already expired
+                    open.LastError);
+                await _inner.TryUpdateAsync(circuitKey, open, halfOpen, cancellationToken);
+                return halfOpen;
+            }
+
+            return current;
+        }
+
+        public ValueTask<bool> TryUpdateAsync(string circuitKey, DistributedCircuitSnapshot expected, DistributedCircuitSnapshot updated, CancellationToken cancellationToken)
+        {
+            if (updated.State == CircuitState.HalfOpen)
+            {
+                throw new InvalidOperationException("cas unavailable");
+            }
+
+            return _inner.TryUpdateAsync(circuitKey, expected, updated, cancellationToken);
+        }
+
+        public ValueTask PublishHealthAsync(string circuitKey, DistributedHealthContribution contribution, CancellationToken cancellationToken) =>
+            _inner.PublishHealthAsync(circuitKey, contribution, cancellationToken);
+
+        public ValueTask<DistributedHealthAggregate> GetAggregatedHealthAsync(string circuitKey, DateTimeOffset utcNow, TimeSpan maxAge, CancellationToken cancellationToken) =>
+            _inner.GetAggregatedHealthAsync(circuitKey, utcNow, maxAge, cancellationToken);
 
         public ValueTask ClearHealthAsync(string circuitKey, CancellationToken cancellationToken) =>
             _inner.ClearHealthAsync(circuitKey, cancellationToken);

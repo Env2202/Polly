@@ -155,8 +155,8 @@ public class SelfTuningRetryResilienceStrategyTests
         var strategy = CreateStrategy(options);
         var pipeline = strategy.AsPipeline();
 
-        // Drive failure rate high with several failing executions (each does multiple attempts).
-        for (var i = 0; i < 3; i++)
+        // One sample per logical operation (not per retry attempt).
+        for (var i = 0; i < 5; i++)
         {
             try
             {
@@ -167,11 +167,44 @@ public class SelfTuningRetryResilienceStrategyTests
             }
         }
 
-        strategy.Metrics.GetSnapshot().SampleCount.ShouldBeGreaterThanOrEqualTo(5);
-        strategy.Metrics.GetSnapshot().FailureRate.ShouldBeGreaterThan(0.5);
+        strategy.Metrics.GetSnapshot().SampleCount.ShouldBe(5);
+        strategy.Metrics.GetSnapshot().FailureRate.ShouldBe(1.0);
 
         var (attempts, _) = strategy.GetCurrentParameters();
         attempts.ShouldBeLessThan(4);
+    }
+
+    [Fact]
+    public async Task Execute_OneSamplePerLogicalOperation_DespiteRetries()
+    {
+        var options = CreateOptions();
+        options.InitialRetryAttempts = 3;
+        options.InitialDelay = TimeSpan.Zero;
+        options.MinDelay = TimeSpan.Zero;
+        options.MaxDelay = TimeSpan.Zero;
+        options.UseJitter = false;
+        options.MinimumSamples = 1000;
+        options.ShouldHandle = args => new ValueTask<bool>(args.Outcome.Exception is InvalidOperationException);
+
+        var strategy = CreateStrategy(options);
+        var pipeline = strategy.AsPipeline();
+        var calls = 0;
+
+        try
+        {
+            await pipeline.ExecuteAsync<int>(_ =>
+            {
+                calls++;
+                throw new InvalidOperationException();
+            });
+        }
+        catch (InvalidOperationException)
+        {
+        }
+
+        calls.ShouldBe(4); // initial + 3 retries
+        strategy.Metrics.GetSnapshot().SampleCount.ShouldBe(1);
+        strategy.Metrics.GetSnapshot().FailureCount.ShouldBe(1);
     }
 
     [Fact]
@@ -190,6 +223,83 @@ public class SelfTuningRetryResilienceStrategyTests
                 MinDelay = TimeSpan.FromSeconds(5),
                 MaxDelay = TimeSpan.FromMilliseconds(1),
             }));
+
+        Should.Throw<System.ComponentModel.DataAnnotations.ValidationException>(() =>
+            new ResiliencePipelineBuilder().AddSelfTuningRetry(new SelfTuningRetryStrategyOptions
+            {
+                Capacity = 10,
+                MinimumSamples = 20,
+            }));
+
+        Should.Throw<System.ComponentModel.DataAnnotations.ValidationException>(() =>
+            new ResiliencePipelineBuilder().AddSelfTuningRetry(new SelfTuningRetryStrategyOptions
+            {
+                MinRetryAttempts = 2,
+                MaxRetryAttempts = 5,
+                InitialRetryAttempts = 1,
+            }));
+
+        Should.Throw<System.ComponentModel.DataAnnotations.ValidationException>(() =>
+            new ResiliencePipelineBuilder().AddSelfTuningRetry(new SelfTuningRetryStrategyOptions
+            {
+                MinDelay = TimeSpan.FromMilliseconds(100),
+                MaxDelay = TimeSpan.FromSeconds(1),
+                InitialDelay = TimeSpan.FromSeconds(5),
+            }));
+
+        Should.Throw<System.ComponentModel.DataAnnotations.ValidationException>(() =>
+            new ResiliencePipelineBuilder().AddSelfTuningRetry(new SelfTuningRetryStrategyOptions
+            {
+                MinDelay = TimeSpan.FromMilliseconds(100),
+                MaxDelay = TimeSpan.FromSeconds(1),
+                InitialDelay = TimeSpan.FromMilliseconds(10),
+            }));
+    }
+
+    [Fact]
+    public async Task Execute_CallerCancellation_DoesNotRecordMetrics()
+    {
+        var options = CreateOptions();
+        options.InitialRetryAttempts = 1;
+        options.InitialDelay = TimeSpan.Zero;
+        options.MinDelay = TimeSpan.Zero;
+        options.MaxDelay = TimeSpan.Zero;
+        options.UseJitter = false;
+        options.MinimumSamples = 1000;
+        options.ShouldHandle = args => new ValueTask<bool>(false); // do not retry OCE
+
+        var strategy = CreateStrategy(options);
+        var pipeline = strategy.AsPipeline();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Should.ThrowAsync<OperationCanceledException>(async () =>
+            await pipeline.ExecuteAsync<int>(_ => throw new OperationCanceledException(cts.Token), cts.Token));
+
+        strategy.Metrics.GetSnapshot().SampleCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Execute_OperationCanceledWithoutCallerToken_StillRecordsSample()
+    {
+        var options = CreateOptions();
+        options.InitialRetryAttempts = 1;
+        options.InitialDelay = TimeSpan.Zero;
+        options.MinDelay = TimeSpan.Zero;
+        options.MaxDelay = TimeSpan.Zero;
+        options.UseJitter = false;
+        options.MinimumSamples = 1000;
+        // Not handled → treated as success for adaptive metrics (predicate-based).
+        options.ShouldHandle = args => new ValueTask<bool>(false);
+
+        var strategy = CreateStrategy(options);
+        var pipeline = strategy.AsPipeline();
+
+        await Should.ThrowAsync<OperationCanceledException>(async () =>
+            await pipeline.ExecuteAsync<int>(_ => throw new OperationCanceledException()));
+
+        // OCE without caller cancellation still records (unlike cancelled context token).
+        strategy.Metrics.GetSnapshot().SampleCount.ShouldBe(1);
     }
 
     [Fact]

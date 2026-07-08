@@ -150,9 +150,10 @@ public class MultiDimensionCircuitBreakerTests
     }
 
     [Fact]
-    public void Behavior_ConsecutiveFailuresTrip_WithoutMinimumThroughput()
+    public void Behavior_ConsecutiveFailuresTrip_WithThroughputGate()
     {
         var metrics = Substitute.For<HealthMetrics>(TimeProvider.System);
+        // Throughput 3 >= min(10, 3) = 3 → consecutive may trip even when ratio min is higher.
         metrics.GetHealthInfo().Returns(new HealthInfo(3, 1.0, 3, ConsecutiveFailureCount: 3));
 
         var behavior = new AdvancedCircuitBehavior(
@@ -163,6 +164,22 @@ public class MultiDimensionCircuitBreakerTests
 
         behavior.OnActionFailure(CircuitState.Closed, out var shouldBreak);
         shouldBreak.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Behavior_ConsecutiveFailures_DoNotTrip_WithoutEnoughThroughput()
+    {
+        var metrics = Substitute.For<HealthMetrics>(TimeProvider.System);
+        metrics.GetHealthInfo().Returns(new HealthInfo(1, 1.0, 1, ConsecutiveFailureCount: 5));
+
+        var behavior = new AdvancedCircuitBehavior(
+            failureRatio: 0.5,
+            minimumThroughput: 10,
+            metrics,
+            consecutiveFailureThreshold: 3);
+
+        behavior.OnActionFailure(CircuitState.Closed, out var shouldBreak);
+        shouldBreak.ShouldBeFalse();
     }
 
     [Fact]
@@ -179,6 +196,27 @@ public class MultiDimensionCircuitBreakerTests
 
         behavior.OnActionFailure(CircuitState.Closed, out var shouldBreak);
         shouldBreak.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void AddCircuitBreaker_SlowCallDurationZero_Throws()
+    {
+        Should.Throw<System.ComponentModel.DataAnnotations.ValidationException>(() =>
+            new ResiliencePipelineBuilder().AddCircuitBreaker(new CircuitBreakerStrategyOptions
+            {
+                SlowCallDurationThreshold = TimeSpan.Zero,
+                SlowCallRateThreshold = 0.5,
+            }));
+    }
+
+    [Fact]
+    public void AddCircuitBreaker_SlowCallRateWithoutDuration_Throws()
+    {
+        Should.Throw<System.ComponentModel.DataAnnotations.ValidationException>(() =>
+            new ResiliencePipelineBuilder().AddCircuitBreaker(new CircuitBreakerStrategyOptions
+            {
+                SlowCallRateThreshold = 0.5,
+            }));
     }
 
     [Fact]

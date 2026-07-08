@@ -74,5 +74,24 @@ public static class SelfTuningRetryResiliencePipelineBuilderExtensions
             throw new ValidationException(
                 $"{nameof(options.MinDelay)} must be less than or equal to {nameof(options.MaxDelay)}.");
         }
+
+        if (options.MinimumSamples > options.Capacity)
+        {
+            throw new ValidationException(
+                $"{nameof(options.MinimumSamples)} must be less than or equal to {nameof(options.Capacity)}.");
+        }
+
+        if (options.InitialRetryAttempts < options.MinRetryAttempts
+            || options.InitialRetryAttempts > options.MaxRetryAttempts)
+        {
+            throw new ValidationException(
+                $"{nameof(options.InitialRetryAttempts)} must be between {nameof(options.MinRetryAttempts)} and {nameof(options.MaxRetryAttempts)} (inclusive).");
+        }
+
+        if (options.InitialDelay < options.MinDelay || options.InitialDelay > options.MaxDelay)
+        {
+            throw new ValidationException(
+                $"{nameof(options.InitialDelay)} must be between {nameof(options.MinDelay)} and {nameof(options.MaxDelay)} (inclusive).");
+        }
     }
 }

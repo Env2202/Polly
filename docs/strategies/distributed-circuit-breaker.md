@@ -17,6 +17,26 @@ It is **additive**. The classic in-process `AddCircuitBreaker` API and behavior 
 
 The distributed strategy shares **state** and **health contributions** through an `IDistributedCircuitStateStore` (Redis, etcd, SQL, etc.—or the in-memory store for tests).
 
+### Trust model (security)
+
+The state store is a **privileged control plane**. Every writer is treated as a co-equal service instance:
+
+| Capability of a store writer | Impact |
+|------------------------------|--------|
+| Write circuit snapshot | Open/close the circuit for the whole cluster |
+| Publish health as any `InstanceId` | Inflate failure rate or consecutive streaks; trip the cluster |
+| Spoof half-open lease owner | Steal the only probe slot |
+
+**Requirements for production:**
+
+1. Mutual authentication and network isolation of the backend (Redis ACL, mTLS, private network).
+2. Unique, non-guessable `InstanceId` per process (default GUID is fine).
+3. Namespace `CircuitKey` per environment/tenant (`prod:payments-api`, not bare `payments`).
+4. Never expose the store to untrusted clients or multi-tenant apps that share one backend without isolation.
+5. Prefer `FailClosed` partition policy when the store itself may be attacked or unreliable.
+
+`InMemoryDistributedCircuitStateStore` is for **tests and single-process demos only**. It bounds distinct keys via `MaxTrackedCircuitKeys` (default 10_000).
+
 ---
 
 ## Architecture
@@ -77,8 +97,10 @@ ResiliencePipelineBuilder
 ```
 
 - **Open for all nodes**: any instance that successfully CAS-writes `Open` updates the shared snapshot; others refresh and reject with `BrokenCircuitException`.
-- **Half-open race**: exactly one instance may CAS from `Open` → `HalfOpen` with `HalfOpenLeaseOwner = instanceId` and a lease expiry. Others keep rejecting until the owner closes or the lease is abandoned (re-open).
+- **Half-open race**: exactly one instance may CAS from `Open` → `HalfOpen` with `HalfOpenLeaseOwner = instanceId` and a lease expiry. Others keep rejecting until the owner closes or the lease is abandoned (soft re-open).
+- **Single-flight probe**: the lease owner allows **at most one concurrent probe** on that instance (matches classic CB half-open). Additional concurrent calls while the probe is in flight are rejected.
 - **Close**: only the lease owner closes on a successful probe (`HalfOpen` → `Closed`).
+- **Abandoned lease**: expired half-open leases re-open with `OpenUntilUtc = now - AllowedClockSkew` so the circuit is **immediately eligible** for a new half-open attempt (no full break restart).
 
 ---
 
@@ -97,17 +119,28 @@ Health evaluation **does not open** the circuit if aggregation itself fails (avo
 ### 2. Clock synchronization
 
 - Store **absolute UTC** `OpenUntilUtc` (opened_at + break duration on the writer).
-- Readers apply `AllowedClockSkew`:
+- Readers apply `AllowedClockSkew` **only to extend** the open window:
   - Still open while `now < OpenUntilUtc + AllowedClockSkew` (prevents early probes on lagging clocks).
+  - Skew never shortens the break or allows early half-open.
 - Prefer NTP / cloud time sync in production; skew is a safety margin, not a full time-sync protocol.
 
 ### 3. Half-open races
 
 - Optimistic concurrency via **monotonic `Version`** on every write (`next.Version == expected.Version + 1`).
 - Half-open **lease** binds the probe to one `InstanceId` with `HalfOpenLeaseExpiresUtc`.
-- Expired lease → CAS back to `Open` so another instance can probe (avoids permanent half-open deadlock if the owner dies).
+- **Single-flight** on the owner instance: one in-flight probe at a time.
+- Expired lease → soft CAS back to `Open` (short/open-until-past skew) so another instance can probe without a full break restart.
 
-### 4. Health metrics aggregation
+### 4. State refresh / stale windows
+
+| Last known state | Refresh behavior |
+|------------------|------------------|
+| `Closed` | **Force-refresh** on each execution (minimize fail-open after a remote open) |
+| `Open` / `HalfOpen` / other | Throttled by `StateRefreshInterval` (default 100ms) |
+
+Set `StateRefreshInterval = TimeSpan.Zero` for strongest consistency on all paths (higher store load).
+
+### 5. Health metrics aggregation
 
 Each instance keeps a **local sampling window** and publishes:
 
@@ -124,8 +157,12 @@ Each instance keeps a **local sampling window** and publishes:
 
 ```text
 (Throughput >= MinimumThroughput && FailureRate >= FailureRatio)
-  || (ConsecutiveFailureThreshold is set && MaxConsecutiveFailures >= threshold)
+  || (ConsecutiveFailureThreshold is set
+      && MaxConsecutiveFailures >= threshold
+      && Throughput >= min(MinimumThroughput, threshold))
 ```
+
+Consecutive trips require recent sample volume so a poisoned consecutive counter without traffic cannot open the cluster.
 
 ---
 
@@ -201,11 +238,11 @@ new ResiliencePipelineBuilder()
 | `SamplingDuration` | 30s | Health contribution freshness |
 | `FailureRatio` | 0.5 | Cluster failure rate threshold |
 | `MinimumThroughput` | 20 | Min samples before ratio trips |
-| `ConsecutiveFailureThreshold` | null | Optional max consecutive across instances |
-| `AllowedClockSkew` | 2s | Extends open window interpretation |
-| `HalfOpenLeaseDuration` | 5s | Probe ownership TTL |
-| `StateRefreshInterval` | 100ms | Hot-path refresh throttle |
-| `PartitionPolicy` | PreferLastKnownState | Store outage behavior |
+| `ConsecutiveFailureThreshold` | null | Optional max consecutive; also needs throughput ≥ min(MinimumThroughput, threshold) |
+| `AllowedClockSkew` | 2s | Extends open window only (never early probe) |
+| `HalfOpenLeaseDuration` | 5s | Probe ownership TTL; owner single-flight probe |
+| `StateRefreshInterval` | 100ms | Throttle when not Closed; Closed always force-refreshes |
+| `PartitionPolicy` | PreferLastKnownState | Store outage behavior (`FailOpen` = availability over protection) |
 | `MaxCasAttempts` | 8 | CAS retry budget |
 | `ShouldHandle` / `OnOpened` / `OnClosed` / `OnHalfOpened` | standard CB semantics | |
 | `StateProvider` | null | Local view of last known state |
@@ -255,7 +292,7 @@ Coverage includes:
 5. **Slow-call dimension** aligned with multi-dimension local CB.
 6. **OpenTelemetry** attributes for lease owner, version, partition mode.
 7. **Adaptive break duration** from cluster signal quality.
-8. **Sticky half-open** with configurable probe parallelism (today: exactly one).
+8. ~~Sticky half-open with configurable probe parallelism~~ — **done**: single-flight probe per lease owner.
 
 ---
 

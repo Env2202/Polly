@@ -36,6 +36,12 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
 
     private DistributedCircuitSnapshot _lastKnown = DistributedCircuitSnapshot.Closed;
     private DateTimeOffset _lastRefreshUtc = DateTimeOffset.MinValue;
+
+    /// <summary>
+    /// 0 = free, 1 = a half-open probe is in flight on this instance (single-flight).
+    /// </summary>
+    private int _halfOpenProbeInFlight;
+
     public DistributedCircuitBreakerResilienceStrategy(
         DistributedCircuitBreakerStrategyOptions<T> options,
         TimeProvider timeProvider,
@@ -102,95 +108,137 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
         ResilienceContext context,
         TState state)
     {
-        var pre = await OnPreExecuteAsync(context).ConfigureAwait(context.ContinueOnCapturedContext);
-        if (pre is Outcome<T> blocked)
-        {
-            return blocked;
-        }
-
-        var started = _timeProvider.GetUtcNow();
-        Outcome<T> outcome;
+        var probeSlotHeld = false;
         try
         {
-            context.CancellationToken.ThrowIfCancellationRequested();
-            outcome = await callback(context, state).ConfigureAwait(context.ContinueOnCapturedContext);
-        }
+            var pre = await OnPreExecuteAsync(context)
+                .ConfigureAwait(context.ContinueOnCapturedContext);
+            if (pre.Blocked is Outcome<T> blocked)
+            {
+                return blocked;
+            }
+
+            probeSlotHeld = pre.ProbeSlotHeld;
+
+            Outcome<T> outcome;
+            try
+            {
+                context.CancellationToken.ThrowIfCancellationRequested();
+                outcome = await callback(context, state).ConfigureAwait(context.ContinueOnCapturedContext);
+            }
 #pragma warning disable CA1031
-        catch (Exception ex)
-        {
-            outcome = new(ex);
-        }
+            catch (Exception ex)
+            {
+                outcome = new(ex);
+            }
 #pragma warning restore CA1031
 
-        _ = _timeProvider.GetUtcNow() - started;
+            var handled = await _shouldHandle(new CircuitBreakerPredicateArguments<T>(context, outcome))
+                .ConfigureAwait(context.ContinueOnCapturedContext);
 
-        var handled = await _shouldHandle(new CircuitBreakerPredicateArguments<T>(context, outcome))
-            .ConfigureAwait(context.ContinueOnCapturedContext);
+            if (handled)
+            {
+                await OnFailureAsync(outcome, context).ConfigureAwait(context.ContinueOnCapturedContext);
+            }
+            else
+            {
+                await OnSuccessAsync(outcome, context).ConfigureAwait(context.ContinueOnCapturedContext);
+            }
 
-        if (handled)
-        {
-            await OnFailureAsync(outcome, context).ConfigureAwait(context.ContinueOnCapturedContext);
+            return outcome;
         }
-        else
+        finally
         {
-            await OnSuccessAsync(outcome, context).ConfigureAwait(context.ContinueOnCapturedContext);
+            if (probeSlotHeld)
+            {
+                EndHalfOpenProbe();
+            }
         }
-
-        return outcome;
     }
 
-    private async ValueTask<Outcome<T>?> OnPreExecuteAsync(ResilienceContext context)
+    private async ValueTask<(Outcome<T>? Blocked, bool ProbeSlotHeld)> OnPreExecuteAsync(ResilienceContext context)
     {
-        var snapshot = await RefreshStateAsync(context.CancellationToken).ConfigureAwait(context.ContinueOnCapturedContext);
+        // When last known state is Closed, force a remote refresh so we do not fail-open
+        // for a full StateRefreshInterval after another node opens the circuit.
+        var preferForce = false;
+        lock (_localSync)
+        {
+            preferForce = _lastKnown.State == CircuitState.Closed;
+        }
+
+        var snapshot = await RefreshStateAsync(context.CancellationToken, force: preferForce)
+            .ConfigureAwait(context.ContinueOnCapturedContext);
         var now = _timeProvider.GetUtcNow();
 
         switch (snapshot.State)
         {
             case CircuitState.Isolated:
-                return Reject(new IsolatedCircuitException(), snapshot, now);
+                return (Reject(new IsolatedCircuitException(), snapshot, now), false);
 
             case CircuitState.Open:
                 if (IsStillOpen(snapshot, now))
                 {
-                    return Reject(CreateBroken(snapshot, now), snapshot, now);
+                    return (Reject(CreateBroken(snapshot, now), snapshot, now), false);
                 }
 
                 // Break window elapsed (with skew): try to acquire half-open lease.
                 if (await TryAcquireHalfOpenLeaseAsync(snapshot, context).ConfigureAwait(context.ContinueOnCapturedContext))
                 {
-                    return null; // probe allowed
+                    if (TryBeginHalfOpenProbe())
+                    {
+                        return (null, true); // single probe allowed
+                    }
+
+                    // Lease owned/acquired but another concurrent call on this instance is already probing.
+                    return (Reject(CreateBroken(snapshot, now), snapshot, now), false);
                 }
 
                 // Another instance holds the lease or won the race — reject,
                 // unless the circuit recovered (Closed) or we own the half-open lease.
                 snapshot = await RefreshStateAsync(context.CancellationToken, force: true)
                     .ConfigureAwait(context.ContinueOnCapturedContext);
-                if (snapshot.State == CircuitState.Closed
-                    || (snapshot.State == CircuitState.HalfOpen && IsHalfOpenOwner(snapshot)))
+                if (snapshot.State == CircuitState.Closed)
                 {
-                    return null;
+                    return (null, false);
                 }
 
-                return Reject(CreateBroken(snapshot, now), snapshot, now);
+                if (snapshot.State == CircuitState.HalfOpen && TryAllowOwnedHalfOpenProbe(snapshot))
+                {
+                    return (null, true);
+                }
+
+                return (Reject(CreateBroken(snapshot, now), snapshot, now), false);
 
             case CircuitState.HalfOpen:
                 if (IsHalfOpenOwner(snapshot) && !IsHalfOpenLeaseExpired(snapshot, now))
                 {
-                    return null;
+                    // Single-flight: only one concurrent probe on this instance.
+                    if (TryBeginHalfOpenProbe())
+                    {
+                        return (null, true);
+                    }
+
+                    return (Reject(CreateBroken(snapshot, now), snapshot, now), false);
                 }
 
                 if (IsHalfOpenLeaseExpired(snapshot, now))
                 {
-                    // Lease abandoned — reopen so a new probe can be scheduled.
+                    // Lease abandoned — reopen briefly so a new probe can be scheduled.
                     await TryReopenAfterAbandonedLeaseAsync(snapshot, context).ConfigureAwait(context.ContinueOnCapturedContext);
                 }
 
-                return Reject(CreateBroken(snapshot, now), snapshot, now);
+                return (Reject(CreateBroken(snapshot, now), snapshot, now), false);
 
             default:
-                return null;
+                return (null, false);
         }
     }
+
+    private bool TryBeginHalfOpenProbe() =>
+        Interlocked.CompareExchange(ref _halfOpenProbeInFlight, 1, 0) == 0;
+
+    private void EndHalfOpenProbe() =>
+        Interlocked.Exchange(ref _halfOpenProbeInFlight, 0);
 
     private async ValueTask OnSuccessAsync(Outcome<T> outcome, ResilienceContext context)
     {
@@ -293,11 +341,7 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
             return; // cannot evaluate cluster health — do not open from partial data
         }
 
-        var shouldTrip =
-            (aggregate.Throughput >= _minimumThroughput && aggregate.FailureRate >= _failureRatio)
-            || (_consecutiveFailureThreshold is int threshold && aggregate.MaxConsecutiveFailures >= threshold);
-
-        if (!shouldTrip)
+        if (!ShouldTripFromAggregate(aggregate))
         {
             return;
         }
@@ -392,9 +436,14 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
     private async ValueTask TryReopenAfterAbandonedLeaseAsync(DistributedCircuitSnapshot halfOpen, ResilienceContext context)
     {
         var now = _timeProvider.GetUtcNow();
+
+        // Soft reopen: do not restart a full break window. Set OpenUntil so the circuit is
+        // immediately eligible for half-open after AllowedClockSkew (IsStillOpen uses OpenUntil + skew).
+        // openUntil + skew <= now  ⇒  openUntil <= now - skew
+        var openUntil = now - _allowedClockSkew;
         var next = halfOpen.WithNextVersion(
             CircuitState.Open,
-            now + _breakDuration,
+            openUntil,
             now,
             halfOpenLeaseOwner: null,
             halfOpenLeaseExpiresUtc: null,
@@ -600,6 +649,38 @@ internal sealed class DistributedCircuitBreakerResilienceStrategy<T> : Resilienc
 
     private bool IsHalfOpenOwner(DistributedCircuitSnapshot snapshot) =>
         string.Equals(snapshot.HalfOpenLeaseOwner, _instanceId, StringComparison.Ordinal);
+
+    private bool ShouldTripFromAggregate(DistributedHealthAggregate aggregate)
+    {
+        if (aggregate.Throughput >= _minimumThroughput && aggregate.FailureRate >= _failureRatio)
+        {
+            return true;
+        }
+
+        if (_consecutiveFailureThreshold is not int threshold
+            || aggregate.MaxConsecutiveFailures < threshold)
+        {
+            return false;
+        }
+
+        // Require recent sample volume so a single poisoned consecutive counter cannot trip the cluster.
+        return aggregate.Throughput >= Math.Min(_minimumThroughput, threshold);
+    }
+
+    private bool TryAllowOwnedHalfOpenProbe(DistributedCircuitSnapshot snapshot)
+    {
+        if (!IsHalfOpenOwner(snapshot))
+        {
+            return false;
+        }
+
+        if (IsHalfOpenLeaseExpired(snapshot, _timeProvider.GetUtcNow()))
+        {
+            return false;
+        }
+
+        return TryBeginHalfOpenProbe();
+    }
 
     private Outcome<T> Reject(ExecutionRejectedException exception, DistributedCircuitSnapshot snapshot, DateTimeOffset now)
     {

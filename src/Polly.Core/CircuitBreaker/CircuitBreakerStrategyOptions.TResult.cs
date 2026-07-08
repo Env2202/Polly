@@ -62,6 +62,7 @@ public class CircuitBreakerStrategyOptions<TResult> : ResilienceStrategyOptions
     /// <summary>
     /// Gets or sets the duration threshold above which a successful call is counted as slow.
     /// When <see langword="null"/> (default), slow-call tracking is disabled.
+    /// When set, must be greater than <see cref="TimeSpan.Zero"/>.
     /// </summary>
     /// <value>The default value is <see langword="null"/> (disabled).</value>
     public TimeSpan? SlowCallDurationThreshold { get; set; }
@@ -78,6 +79,8 @@ public class CircuitBreakerStrategyOptions<TResult> : ResilienceStrategyOptions
     /// <summary>
     /// Gets or sets the number of consecutive handled failures after which the circuit will break.
     /// When <see langword="null"/> (default), consecutive failures do not trip the circuit independently.
+    /// When set, also requires throughput of at least <c>min(<see cref="MinimumThroughput"/>, threshold)</c>
+    /// so a streak without sufficient recent samples does not trip.
     /// </summary>
     /// <value>The default value is <see langword="null"/> (disabled). When set, must be 1 or greater.</value>
     [Range(1, int.MaxValue)]

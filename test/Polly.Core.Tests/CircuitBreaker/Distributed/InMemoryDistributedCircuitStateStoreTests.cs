@@ -134,6 +134,72 @@ public class InMemoryDistributedCircuitStateStoreTests
     }
 
     [Fact]
+    public async Task MaxTrackedCircuitKeys_BlocksUnboundedGrowth()
+    {
+        var store = new InMemoryDistributedCircuitStateStore(maxTrackedCircuitKeys: 1);
+        store.MaxTrackedCircuitKeys.ShouldBe(1);
+
+        var open = DistributedCircuitSnapshot.Closed.WithNextVersion(
+            CircuitState.Open,
+            DateTimeOffset.UtcNow.AddSeconds(1),
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            "e");
+        (await store.TryUpdateAsync("k1", DistributedCircuitSnapshot.Closed, open, CancellationToken.None)).ShouldBeTrue();
+
+        var open2 = DistributedCircuitSnapshot.Closed.WithNextVersion(
+            CircuitState.Open,
+            DateTimeOffset.UtcNow.AddSeconds(1),
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            "e");
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await store.TryUpdateAsync("k2", DistributedCircuitSnapshot.Closed, open2, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task MaxTrackedCircuitKeys_CountsHealthOnlyKeys()
+    {
+        var store = new InMemoryDistributedCircuitStateStore(maxTrackedCircuitKeys: 1);
+        await store.PublishHealthAsync(
+            "health-only",
+            new DistributedHealthContribution("a", 1, 0, 0, DateTimeOffset.UtcNow),
+            CancellationToken.None);
+
+        var open = DistributedCircuitSnapshot.Closed.WithNextVersion(
+            CircuitState.Open,
+            DateTimeOffset.UtcNow.AddSeconds(1),
+            DateTimeOffset.UtcNow,
+            null,
+            null,
+            "e");
+        await Should.ThrowAsync<InvalidOperationException>(async () =>
+            await store.TryUpdateAsync("other", DistributedCircuitSnapshot.Closed, open, CancellationToken.None));
+    }
+
+    [Fact]
+    public void Constructor_InvalidMaxKeys_Throws()
+    {
+        Should.Throw<ArgumentOutOfRangeException>(() => new InMemoryDistributedCircuitStateStore(0));
+    }
+
+    [Fact]
+    public async Task GetAggregatedHealth_SaturatesOnOverflow()
+    {
+        var store = new InMemoryDistributedCircuitStateStore();
+        var now = DateTimeOffset.UtcNow;
+        await store.PublishHealthAsync("k", new DistributedHealthContribution("a", int.MaxValue, int.MaxValue, 1, now), CancellationToken.None);
+        await store.PublishHealthAsync("k", new DistributedHealthContribution("b", int.MaxValue, int.MaxValue, 2, now), CancellationToken.None);
+
+        var aggregate = await store.GetAggregatedHealthAsync("k", now, TimeSpan.FromMinutes(1), CancellationToken.None);
+        aggregate.SuccessCount.ShouldBe(int.MaxValue);
+        aggregate.FailureCount.ShouldBe(int.MaxValue);
+        aggregate.ContributingInstances.ShouldBe(2);
+    }
+
+    [Fact]
     public void DistributedTypes_ExposeComputedProperties()
     {
         var contribution = new DistributedHealthContribution("id", 3, 2, 1, DateTimeOffset.UtcNow);
